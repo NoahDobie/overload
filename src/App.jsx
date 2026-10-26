@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useStore, isStale } from './store.js'
 import { fmtDate } from './lib/util.js'
@@ -42,19 +42,22 @@ function WorkoutGuard() {
   const program = useStore(s => s.program)
   const { finishWorkout, discardWorkout, touchWorkout } = useStore.getState()
   const [stale, setStale] = useState(false)
+  // useNavigate returns a new function on every navigation; the launch check must run once.
+  const navRef = useRef(nav)
+  navRef.current = nav
 
   useEffect(() => {
     const check = launch => {
       const a = useStore.getState().active
       if (!a) return setStale(false)
       if (isStale(a)) setStale(true)
-      else if (launch && window.location.pathname === '/') nav('/workout', { replace: true })
+      else if (launch && window.location.pathname === '/') navRef.current('/workout', { replace: true })
     }
     check(true)
     const onVisible = () => { if (document.visibilityState === 'visible') check(false) }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [nav])
+  }, [])
 
   if (!stale || !active) return null
   const name = program?.days.find(d => d.id === active.dayId)?.name || 'your workout'
