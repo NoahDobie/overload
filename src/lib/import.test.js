@@ -108,3 +108,20 @@ describe('spreadsheet import', () => {
     expect(res.program.days[0].exercises[0].muscles).toEqual(['chest', 'triceps'])
   })
 })
+
+describe('renamedFrom', () => {
+  it('maps old names with history to new ones, leaving names still in use alone', async () => {
+    const { historyRenames, withoutRenames } = await import('./import.js')
+    const { program } = normalizeProgram({ days: [
+      { name: 'Push 1', exercises: [{ name: 'Barbell Bench Press', reps: '3-5', renamedFrom: 'Bench Press' }, { name: 'Cable Pushdown', reps: '8-12', renamedFrom: ['Tricep Pushdown', 'Pushdown'] }] },
+      { name: 'Push 2', exercises: [{ name: 'Barbell Bench Press', reps: '3-5', renamedFrom: 'Flat Bench' }, { name: 'Dips', reps: '8-12', renamedFrom: 'Squat' }] },
+      { name: 'Legs', exercises: [{ name: 'Squat', reps: '5' }] }
+    ] })
+    const sessions = [
+      { id: 1, date: '2026-10-20', entries: [{ name: 'Bench Press', sets: [{ w: 250, r: 5, done: true }] }, { name: 'flat bench', sets: [{ w: 245, r: 5, done: true }] }] },
+      { id: 2, date: '2026-10-21', entries: [{ name: 'Tricep Pushdown', sets: [{ w: 50, r: 10, done: false }] }, { name: 'Squat', sets: [{ w: 300, r: 5, done: true }] }] }
+    ]
+    expect(historyRenames(program, sessions)).toEqual({ 'Bench Press': 'Barbell Bench Press', 'Flat Bench': 'Barbell Bench Press' })
+    expect(JSON.stringify(withoutRenames(program))).not.toMatch(/renamedFrom/)
+  })
+})

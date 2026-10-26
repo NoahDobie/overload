@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useStore, blockOf } from '../store.js'
-import { importFile, normalizeProgram, downloadXlsx } from '../lib/import.js'
+import { importFile, normalizeProgram, downloadXlsx, historyRenames, withoutRenames } from '../lib/import.js'
 import { normalizeBlock, startDeloadNow, restartThisWeek, restartNextMonday } from '../lib/block.js'
 import { syncedPart, mergeDocs } from '../lib/merge.js'
 import { syncConfigured, sendMagicLink, verifyCode, signOut } from '../lib/sync.js'
@@ -22,8 +22,11 @@ const download = (name, text, type = 'application/json') => {
 function ProgramSection() {
   const S = useStore()
   const setProgram = useStore(s => s.setProgram)
+  const renameHistory = useStore(s => s.renameHistory)
+  const [moveHistory, setMoveHistory] = useState(true)
   const fileRef = useRef(null)
   const [preview, setPreview] = useState(null)   // { program, errors, warnings }
+  const renames = preview?.program ? Object.entries(historyRenames(preview.program, S.sessions)) : []
 
   const onFile = async e => {
     const f = e.target.files?.[0]
@@ -34,7 +37,8 @@ function ProgramSection() {
   // A file that says nothing about runs keeps the current run plan.
   const apply = () => {
     const current = S.program ? programRuns(S.program) : undefined
-    setProgram({ ...preview.program, runs: keepRunIds(preview.program.runs, current) ?? current })
+    if (renames.length && moveHistory) renameHistory(Object.fromEntries(renames))
+    setProgram(withoutRenames({ ...preview.program, runs: keepRunIds(preview.program.runs, current) ?? current }))
     setPreview(null)
   }
   const exportProgram = () => {
@@ -79,6 +83,13 @@ function ProgramSection() {
           <p className="muted small">{preview.program.runs
             ? (preview.program.runs.enabled ? `Runs: ${preview.program.runs.plan.map(r => r.name + (r.km != null ? ` ${r.km} km` : '')).join(', ')}.` : 'Runs: off.')
             : 'No runs in this file: your current run plan is kept.'}</p>
+          {renames.length > 0 && (
+            <label className="toggle-row renames">
+              <span><b>Move logged history to the new names</b><br />
+                <span className="muted small">{renames.map(([a, b]) => `${a} → ${b}`).join(' · ')}</span></span>
+              <input type="checkbox" checked={moveHistory} onChange={e => setMoveHistory(e.target.checked)} />
+            </label>
+          )}
           <p className="muted small">Replaces the current program. Your logged history is kept: exercises with the same name continue their progression.</p>
           <button className="btn primary full" onClick={apply}>Import</button>
         </>}

@@ -396,3 +396,4 @@ input.day-name:focus { background: var(--surface-2); }
 .ed-row { gap: 4px; }
 .ed-row .ed-ex { flex: 1; min-width: 0; }
 .toggle-row h2 { margin-bottom: 2px; }
+.toggle-row.renames { align-items: flex-start; background: var(--surface-2); border-radius: 12px; padding: 12px; }

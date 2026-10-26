@@ -5,6 +5,7 @@ import { normalizeMuscle } from './muscles.js'
 import { normalizeBlock } from './block.js'
 import { loadLibrary, fillMuscles } from './exercises.js'
 import { normalizeRuns, programRuns, MAX_RUNS } from './runs.js'
+import { historyFor, exKey } from './progression.js'
 
 export const SHEET_COLUMNS = ['Week', 'Day', 'DayName', 'Order', 'Exercise', 'Sets', 'Reps', 'RepMin', 'RepMax', 'RIR', 'Increment', 'StartWeight', 'HitsToProgress', 'Muscles', 'Notes']
 export const SETTINGS_COLUMNS = ['Build', 'Deload', 'Runs']
@@ -66,7 +67,9 @@ function normalizeExercise(e, where, errors, warnings, used) {
     startWeight: num(e.startWeight) ?? DEFAULTS.startWeight,
     hitsToProgress: num(e.hitsToProgress) ?? DEFAULTS.hitsToProgress,
     muscles: [],
-    notes: e.notes ? String(e.notes) : ''
+    notes: e.notes ? String(e.notes) : '',
+    // Old name(s) in a file whose exercises were renamed, so import can move the logged history
+    ...(e.renamedFrom ? { renamedFrom: [].concat(e.renamedFrom).map(String).filter(Boolean) } : {})
   }
   const bad = k => !Number.isFinite(ex[k]) || ex[k] < 0
   if (repMin == null) errors.push(`${where} (${name}): needs Reps (e.g. 8-10) or RepMin/RepMax`)
@@ -121,6 +124,28 @@ export function normalizeProgram(input) {
   }
   return { program: errors.length ? null : program, errors, warnings }
 }
+
+/**
+ * { oldName: newName } for exercises marked renamedFrom whose old name has logged history and
+ * is no longer used in the program (so it is not taken from an exercise that keeps the name).
+ */
+export function historyRenames(program, sessions) {
+  const names = new Set(program.days.flatMap(d => d.exercises.map(e => exKey(e.name))))
+  const out = {}
+  for (const d of program.days) for (const e of d.exercises) {
+    for (const old of e.renamedFrom || []) {
+      if (exKey(old) === exKey(e.name) || names.has(exKey(old)) || out[old]) continue
+      if (historyFor(sessions, old, { includeDeload: true }).length) out[old] = e.name
+    }
+  }
+  return out
+}
+
+/** The program without renamedFrom markers (they only matter during import). */
+export const withoutRenames = program => ({
+  ...program,
+  days: program.days.map(d => ({ ...d, exercises: d.exercises.map(({ renamedFrom, ...e }) => e) }))
+})
 
 const lc = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [String(k).trim().toLowerCase().replace(/[\s_]/g, ''), typeof v === 'string' ? v.trim() : v]))
 
