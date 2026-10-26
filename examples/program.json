@@ -1,0 +1,76 @@
+{
+  "name": "PPLUL A/B",
+  "unit": "lb",
+  "block": { "build": 3, "deload": 1 },
+  "runTargets": {
+    "easy": { "miles": 4, "notes": "Zone 2, conversational" },
+    "quality": { "miles": 5, "notes": "Tempo or intervals" },
+    "long": { "miles": 8, "notes": "Easy pace, time on feet" }
+  },
+  "days": [
+    { "id": "A1", "week": "A", "name": "Push A", "exercises": [
+      { "name": "Barbell Bench Press", "sets": 3, "reps": "6-8", "rir": 2, "increment": 5, "startWeight": 135, "muscles": "chest, triceps, shoulders" },
+      { "name": "Seated DB Shoulder Press", "sets": 3, "reps": "8-10", "rir": 2, "increment": 5, "startWeight": 40, "muscles": "shoulders, triceps" },
+      { "name": "Incline DB Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 50, "muscles": "chest, shoulders" },
+      { "name": "Cable Lateral Raise", "sets": 3, "reps": "12-15", "rir": 1, "increment": 2.5, "startWeight": 10, "muscles": "shoulders" },
+      { "name": "Rope Triceps Pushdown", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "startWeight": 40, "muscles": "triceps" }
+    ]},
+    { "id": "A2", "week": "A", "name": "Pull A", "exercises": [
+      { "name": "Weighted Pull-up", "sets": 3, "reps": "5-8", "rir": 2, "increment": 5, "startWeight": 0, "muscles": "lats, biceps" },
+      { "name": "Chest-Supported Row", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 90, "muscles": "upper back, lats, biceps" },
+      { "name": "Face Pull", "sets": 3, "reps": "12-15", "rir": 1, "increment": 5, "startWeight": 30, "muscles": "rear delts, traps" },
+      { "name": "Barbell Curl", "sets": 3, "reps": "8-12", "rir": 1, "increment": 5, "startWeight": 50, "muscles": "biceps, forearms" }
+    ]},
+    { "id": "A3", "week": "A", "name": "Legs A", "exercises": [
+      { "name": "Back Squat", "sets": 3, "reps": "5-8", "rir": 2, "increment": 5, "startWeight": 185, "muscles": "quads, glutes, adductors" },
+      { "name": "Romanian Deadlift", "sets": 3, "reps": "8-10", "rir": 2, "increment": 10, "startWeight": 155, "muscles": "hamstrings, glutes, lower back" },
+      { "name": "Leg Extension", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "startWeight": 90, "muscles": "quads" },
+      { "name": "Standing Calf Raise", "sets": 3, "reps": "10-15", "rir": 1, "increment": 10, "startWeight": 120, "muscles": "calves" }
+    ]},
+    { "id": "A4", "week": "A", "name": "Upper A", "exercises": [
+      { "name": "Overhead Press", "sets": 3, "reps": "5-8", "rir": 2, "increment": 5, "startWeight": 95, "muscles": "shoulders, triceps" },
+      { "name": "Lat Pulldown", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 120, "muscles": "lats, biceps" },
+      { "name": "DB Bench Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 60, "muscles": "chest, triceps" },
+      { "name": "Seated Cable Row", "sets": 3, "reps": "10-12", "rir": 2, "increment": 5, "startWeight": 110, "muscles": "upper back, biceps" },
+      { "name": "Hammer Curl", "sets": 2, "reps": "10-15", "rir": 1, "increment": 5, "startWeight": 30, "muscles": "biceps, forearms" }
+    ]},
+    { "id": "A5", "week": "A", "name": "Lower A", "exercises": [
+      { "name": "Trap Bar Deadlift", "sets": 3, "reps": "4-6", "rir": 2, "increment": 10, "startWeight": 225, "muscles": "glutes, hamstrings, quads, lower back" },
+      { "name": "Bulgarian Split Squat", "sets": 3, "reps": "8-10", "rir": 2, "increment": 5, "startWeight": 30, "muscles": "quads, glutes" },
+      { "name": "Lying Leg Curl", "sets": 3, "reps": "10-12", "rir": 1, "increment": 5, "startWeight": 70, "muscles": "hamstrings" },
+      { "name": "Hanging Leg Raise", "sets": 3, "reps": "10-15", "rir": 1, "increment": 0, "startWeight": 0, "muscles": "abs, hip flexors" }
+    ]},
+    { "id": "B1", "week": "B", "name": "Push B", "exercises": [
+      { "name": "Incline Barbell Press", "sets": 3, "reps": "6-8", "rir": 2, "increment": 5, "startWeight": 115, "muscles": "chest, shoulders, triceps" },
+      { "name": "Weighted Dip", "sets": 3, "reps": "6-10", "rir": 2, "increment": 5, "startWeight": 0, "muscles": "chest, triceps" },
+      { "name": "Machine Shoulder Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 70, "muscles": "shoulders, triceps" },
+      { "name": "DB Lateral Raise", "sets": 3, "reps": "12-20", "rir": 1, "increment": 2.5, "startWeight": 15, "muscles": "shoulders" },
+      { "name": "Overhead Cable Extension", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "startWeight": 35, "muscles": "triceps" }
+    ]},
+    { "id": "B2", "week": "B", "name": "Pull B", "exercises": [
+      { "name": "Barbell Row", "sets": 3, "reps": "6-8", "rir": 2, "increment": 5, "startWeight": 135, "muscles": "upper back, lats, lower back" },
+      { "name": "Neutral-Grip Pulldown", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 110, "muscles": "lats, biceps" },
+      { "name": "Reverse Pec Deck", "sets": 3, "reps": "12-15", "rir": 1, "increment": 5, "startWeight": 50, "muscles": "rear delts, upper back" },
+      { "name": "Incline DB Curl", "sets": 3, "reps": "10-12", "rir": 1, "increment": 5, "startWeight": 25, "muscles": "biceps" }
+    ]},
+    { "id": "B3", "week": "B", "name": "Legs B", "exercises": [
+      { "name": "Front Squat", "sets": 3, "reps": "5-8", "rir": 2, "increment": 5, "startWeight": 135, "muscles": "quads, glutes, abs" },
+      { "name": "Hip Thrust", "sets": 3, "reps": "8-12", "rir": 2, "increment": 10, "startWeight": 135, "muscles": "glutes, hamstrings" },
+      { "name": "Leg Press", "sets": 3, "reps": "10-15", "rir": 2, "increment": 10, "startWeight": 270, "muscles": "quads, glutes" },
+      { "name": "Seated Calf Raise", "sets": 3, "reps": "12-15", "rir": 1, "increment": 5, "startWeight": 70, "muscles": "calves" }
+    ]},
+    { "id": "B4", "week": "B", "name": "Upper B", "exercises": [
+      { "name": "Close-Grip Bench Press", "sets": 3, "reps": "6-8", "rir": 2, "increment": 5, "startWeight": 125, "muscles": "triceps, chest" },
+      { "name": "Pendlay Row", "sets": 3, "reps": "6-8", "rir": 2, "increment": 5, "startWeight": 125, "muscles": "upper back, lats" },
+      { "name": "Arnold Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "startWeight": 35, "muscles": "shoulders" },
+      { "name": "Single-Arm Cable Row", "sets": 3, "reps": "10-12", "rir": 2, "increment": 5, "startWeight": 50, "muscles": "lats, upper back" },
+      { "name": "Cable Curl", "sets": 2, "reps": "12-15", "rir": 1, "increment": 5, "startWeight": 40, "muscles": "biceps" }
+    ]},
+    { "id": "B5", "week": "B", "name": "Lower B", "exercises": [
+      { "name": "Conventional Deadlift", "sets": 3, "reps": "3-5", "rir": 2, "increment": 10, "startWeight": 245, "muscles": "glutes, hamstrings, lower back, upper back" },
+      { "name": "Walking Lunge", "sets": 3, "reps": "10-12", "rir": 2, "increment": 5, "startWeight": 30, "muscles": "quads, glutes" },
+      { "name": "Nordic Curl", "sets": 3, "reps": "4-8", "rir": 2, "increment": 0, "startWeight": 0, "muscles": "hamstrings" },
+      { "name": "Cable Crunch", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "startWeight": 60, "muscles": "abs" }
+    ]}
+  ]
+}
