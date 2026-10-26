@@ -60,15 +60,19 @@ export function Segmented({ value, onChange, options }) {
   )
 }
 
-/** Numeric input with − / + buttons. */
-export function Stepper({ value, onChange, step = 1, min = 0, label, width = 64 }) {
+/** Numeric input with − / + buttons, kept within min..max. compact: narrow, for 2-digit values. */
+export function Stepper({ value, onChange, step = 1, min = 0, max = Infinity, label, width = 64, compact = false }) {
   const n = Number(value) || 0
-  const set = v => onChange(Math.max(min, Math.round(v * 100) / 100))
+  const set = v => onChange(Math.min(max, Math.max(min, Math.round(v * 100) / 100)))
+  const typed = raw => {
+    const v = raw.replace(',', '.').replace(/[^0-9.]/g, '')
+    onChange(Number(v) > max ? String(max) : v)
+  }
   return (
-    <div className="stp">
+    <div className={'stp' + (compact ? ' compact' : '')}>
       <button type="button" aria-label={`Less ${label}`} onClick={() => set(n - step)}><Icon name="minus" size={16} /></button>
       <input inputMode="decimal" aria-label={label} style={{ width }} value={value}
-        onChange={e => onChange(e.target.value.replace(/[^0-9.]/g, ''))}
+        onChange={e => typed(e.target.value)}
         onBlur={e => set(Number(e.target.value) || 0)} />
       <button type="button" aria-label={`More ${label}`} onClick={() => set(n + step)}><Icon name="plus" size={16} /></button>
     </div>

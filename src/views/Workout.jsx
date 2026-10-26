@@ -35,8 +35,8 @@ function ExerciseCard({ entry, ei, ex, unit }) {
         {entry.sets.map((s, si) => (
           <div key={si} className={'set' + (s.done ? ' done' : '')}>
             <span className="set-n">{si + 1}</span>
-            <Stepper label={`set ${si + 1} weight`} value={s.w} step={ex?.increment || 5} onChange={w => updateSet(ei, si, { w })} />
-            <Stepper label={`set ${si + 1} reps`} value={s.r} step={1} width={40} onChange={r => updateSet(ei, si, { r })} />
+            <Stepper label={`set ${si + 1} weight`} value={s.w} step={ex?.increment || 5} max={999} width={56} onChange={w => updateSet(ei, si, { w })} />
+            <Stepper label={`set ${si + 1} reps`} value={s.r} step={1} max={99} width={26} compact onChange={r => updateSet(ei, si, { r })} />
             <button className="tick" aria-label={s.done ? `Undo set ${si + 1}` : `Done set ${si + 1}`} aria-pressed={s.done}
               onClick={() => updateSet(ei, si, { done: !s.done })}><Icon name="check" size={20} stroke={3} /></button>
           </div>
