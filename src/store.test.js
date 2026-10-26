@@ -60,3 +60,18 @@ describe('workout in progress', () => {
     vi.useRealTimers()
   })
 })
+
+describe('clearProgram', () => {
+  it('removes the program and workout in progress, keeps history', () => {
+    useStore.getState().resetAll()
+    useStore.getState().setProgram({ name: 'P', days: [{ id: 'A1', week: 'A', name: 'Push', exercises: [{ id: 'b', name: 'Bench', sets: 1, repMin: 5, repMax: 8, rir: 2, increment: 5, startWeight: 100, muscles: [] }] }] })
+    useStore.setState({ sessions: [{ id: 's', date: '2026-10-01', updatedAt: 1, entries: [] }] })
+    useStore.getState().startWorkout('A1')
+    useStore.getState().clearProgram()
+    const S = useStore.getState()
+    expect(S.program).toBeNull()
+    expect(S.active).toBeNull()
+    expect(S.programClearedAt).toBeGreaterThan(0)
+    expect(S.sessions).toHaveLength(1)
+  })
+})

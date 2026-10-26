@@ -4,7 +4,7 @@ import { useStore, blockOf } from '../store.js'
 import { importFile, normalizeProgram, downloadXlsx, historyRenames, withoutRenames } from '../lib/import.js'
 import { normalizeBlock, startDeloadNow, restartThisWeek, restartNextMonday } from '../lib/block.js'
 import { syncedPart, mergeDocs } from '../lib/merge.js'
-import { syncConfigured, sendMagicLink, verifyCode, signOut } from '../lib/sync.js'
+import { syncConfigured, sendMagicLink, verifyCode, signOut, resetAccount } from '../lib/sync.js'
 import { useSync } from '../syncStatus.js'
 import { programRuns, keepRunIds } from '../lib/runs.js'
 import { todayISO, fmtDate } from '../lib/util.js'
@@ -23,6 +23,7 @@ function ProgramSection() {
   const S = useStore()
   const setProgram = useStore(s => s.setProgram)
   const renameHistory = useStore(s => s.renameHistory)
+  const clearProgram = useStore(s => s.clearProgram)
   const [moveHistory, setMoveHistory] = useState(true)
   const fileRef = useRef(null)
   const [preview, setPreview] = useState(null)   // { program, errors, warnings }
@@ -60,6 +61,9 @@ function ProgramSection() {
           <button className="btn grow" onClick={() => downloadXlsx(S.program, `${S.program.name}.xlsx`)}>Export .xlsx</button>
           <button className="btn grow" onClick={exportProgram}>Export .json</button>
         </div>}
+        {S.program && <button className="btn ghost danger small" onClick={() => {
+          if (confirm(`Clear "${S.program.name}"? Your logged workouts, runs and bodyweight are kept, and the program can be rebuilt or imported again.${S.active ? ' The workout in progress will be discarded.' : ''}`)) clearProgram()
+        }}>Clear program</button>}
         <div className="row gap">
           <button className="btn ghost grow small" onClick={() => downloadXlsx(normalizeProgram(sample).program, 'overload-template.xlsx')}>Excel template</button>
           <button className="btn ghost grow small" onClick={() => download('overload-template.json', JSON.stringify(sample, null, 2))}>JSON template</button>
@@ -161,6 +165,14 @@ function AccountSection() {
       if (confirm("Your latest changes haven't synced. Signing out clears this device, so they'd be lost. Sign out anyway?")) await signOut({ force: true })
     } finally { setBusy(false) }
   }
+  const reset = async () => {
+    const typed = prompt('This permanently erases your program, workouts, runs and bodyweight from your account and every signed-in device. It cannot be undone; export a backup first if unsure.\n\nType ERASE to confirm.')
+    if (typed?.trim().toUpperCase() !== 'ERASE') return
+    setBusy(true); setErr('')
+    try { await resetAccount(); alert('Your account is now empty. Other devices clear on their next sync.') }
+    catch (x) { setErr(`Nothing was erased: ${x.message}`) }
+    finally { setBusy(false) }
+  }
   const statusText = {
     syncing: 'Syncing…',
     offline: 'Offline. Changes are saved here and sync when you reconnect.',
@@ -174,6 +186,7 @@ function AccountSection() {
         <p className="small muted">{statusText}</p>
         <button className="btn ghost" onClick={out} disabled={busy}>Sign out</button>
         <p className="small muted">Signing out removes your data from this device. It stays in your account.</p>
+        <button className="btn ghost danger" onClick={reset} disabled={busy}>Erase everything in my account</button>
       </> : sent ? <>
         <p className="small">We emailed <b>{email}</b> a code. Enter it here, or open the link in the email on this device.</p>
         <form className="row gap" onSubmit={verify}>
@@ -196,6 +209,7 @@ function AccountSection() {
 function DataSection() {
   const S = useStore()
   const { applyDoc, resetAll, setSettings } = S
+  const sync = useSync()
   const fileRef = useRef(null)
   const backup = () => download(`overload-backup-${todayISO()}.json`, JSON.stringify(syncedPart(S), null, 2))
   const restore = async e => {
@@ -205,7 +219,7 @@ function DataSection() {
     try {
       const doc = JSON.parse(await f.text())
       if (!Array.isArray(doc.sessions)) throw new Error('Not an Overload backup')
-      if (confirm('Merge this backup into your data? Newer entries win; nothing is deleted.')) applyDoc(mergeDocs(syncedPart(S), doc))
+      if (confirm('Merge this backup into your data? Newer entries win; nothing is deleted.')) applyDoc(mergeDocs(syncedPart(S), { ...doc, resetAt: S.resetAt }))   // a backup restores even across an account reset
     } catch (x) { alert('Could not read backup: ' + x.message) }
   }
   return (
@@ -219,7 +233,12 @@ function DataSection() {
           <button className="btn grow small nowrap" onClick={() => fileRef.current.click()}>Restore backup</button>
           <input ref={fileRef} type="file" hidden accept=".json,application/json" onChange={restore} />
         </div>
-        <button className="btn ghost danger" onClick={() => { if (confirm('Erase everything on this device? Export a backup first if unsure.')) resetAll() }}>Erase all data on this device</button>
+        <button className="btn ghost danger" onClick={() => {
+          const msg = sync.user
+            ? 'Erase this device? You are signed in, so your data downloads again on the next sync. To erase it everywhere, use "Erase everything in my account" under Sync.'
+            : 'Erase everything on this device? Export a backup first if unsure.'
+          if (confirm(msg)) resetAll()
+        }}>Erase all data on this device</button>
       </div>
     </section>
   )

@@ -28,6 +28,17 @@ export async function verifyCode(email, token) {
 }
 
 let signOutImpl = null
+let resetImpl = null
+
+/**
+ * Erase everything in the account: the server copy becomes a blank document with a reset
+ * marker (so other devices wipe their copies on their next sync), then this device is cleared.
+ * Throws, changing nothing, when offline or the upload fails.
+ */
+export const resetAccount = () => {
+  if (!resetImpl) throw new Error('Sign in first')
+  return resetImpl()
+}
 
 /**
  * Sync one last time, sign out and clear this device. Returns false (and stays signed in)
@@ -99,6 +110,27 @@ export function startSync(useStore, onStatus) {
     }
   }
 
+  resetImpl = async () => {
+    if (!user) throw new Error('Sign in first')
+    if (!navigator.onLine) throw new Error("You're offline. Connect and try again.")
+    clearTimeout(timer)
+    while (inflight) await inflight
+    const resetAt = Date.now()
+    const blank = {
+      sessions: [], runs: [], bodyweight: [],
+      program: { deleted: true, updatedAt: resetAt },
+      settings: { unit: 'lb', blockStart: null, updatedAt: resetAt },
+      resetAt
+    }
+    await push(user.id, blank)
+    applying = true
+    useStore.getState().resetAll()
+    useStore.setState({ resetAt, programClearedAt: resetAt })
+    applying = false
+    lastPushed = JSON.stringify(syncedPart(useStore.getState()))
+    status({ state: 'synced', at: Date.now() })
+  }
+
   signOutImpl = async force => {
     clearTimeout(timer)
     if (user && !(await syncNow()) && !force) return false
@@ -140,5 +172,6 @@ export function startSync(useStore, onStatus) {
     clearTimeout(timer)
     clearTimeout(retryTimer)
     signOutImpl = null
+    resetImpl = null
   }
 }

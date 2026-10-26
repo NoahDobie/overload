@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { nextDayIndex, dayNumber } from './rotation.js'
 import { runsForWeek, weekStart, normalizeRuns, programRuns, runKm, runName, runTarget, keepRunIds, MAX_RUNS } from './runs.js'
 import { avg7, weeklyChange } from './bodyweight.js'
-import { mergeDocs } from './merge.js'
+import { mergeDocs, syncedPart, applyReset } from './merge.js'
 import { muscleLoad, levelsOf, normalizeMuscle } from './muscles.js'
 
 const days = ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5'].map(id => ({ id, week: id[0], name: id, exercises: [] }))
@@ -121,5 +121,42 @@ describe('muscles', () => {
     expect(load).toEqual({ chest: 2, triceps: 1 })
     expect(levelsOf(load).chest).toBe(4)
     expect(levelsOf(load).triceps).toBe(2)
+  })
+})
+
+describe('clearing and resetting', () => {
+  const prog = (t, name = 'P') => ({ name, days: [], updatedAt: t })
+
+  it('a cleared program syncs as a tombstone and beats older copies', () => {
+    const phone = syncedPart({ program: null, programClearedAt: 200, sessions: [], runs: [], bodyweight: [], settings: null })
+    expect(phone.program).toEqual({ deleted: true, updatedAt: 200 })
+    const server = { program: prog(100), sessions: [], runs: [], bodyweight: [] }
+    expect(mergeDocs(phone, server).program).toEqual({ deleted: true, updatedAt: 200 })
+    // a program set after the clear wins over the tombstone
+    expect(mergeDocs(phone, { ...server, program: prog(300, 'New') }).program.name).toBe('New')
+  })
+
+  it('an account reset wipes older data from a device that missed it, keeping newer entries', () => {
+    const offlineLaptop = {
+      resetAt: 0, program: prog(50), settings: { unit: 'kg', updatedAt: 50 },
+      sessions: [{ id: 'old', updatedAt: 90 }, { id: 'new', updatedAt: 1500 }],
+      runs: [{ id: 'r', updatedAt: 10 }], bodyweight: []
+    }
+    const server = { resetAt: 1000, program: { deleted: true, updatedAt: 1000 }, settings: { unit: 'lb', blockStart: null, updatedAt: 1000 }, sessions: [], runs: [], bodyweight: [] }
+    const m = mergeDocs(offlineLaptop, server)
+    expect(m.resetAt).toBe(1000)
+    expect(m.sessions.map(s => s.id)).toEqual(['new'])          // logged after the reset: kept
+    expect(m.runs).toEqual([])
+    expect(m.program.deleted).toBe(true)
+    expect(m.settings.unit).toBe('lb')
+    // once both sides know the reset, nothing more is filtered
+    expect(mergeDocs({ ...m }, server).sessions.map(s => s.id)).toEqual(['new'])
+  })
+
+  it('applyReset keeps only what changed after the reset', () => {
+    const d = applyReset({ sessions: [{ id: 1, updatedAt: 5 }, { id: 2 }], runs: [], bodyweight: [], program: prog(20), settings: { updatedAt: 1 } }, 10)
+    expect(d.sessions).toEqual([])
+    expect(d.program).toEqual(prog(20))
+    expect(d.settings.updatedAt).toBe(0)
   })
 })

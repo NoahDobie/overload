@@ -35,6 +35,8 @@ export const useStore = create(persist((set, get) => ({
   bodyweight: [],
   settings: { unit: 'lb', blockStart: null, updatedAt: 0 },
   active: null,
+  programClearedAt: 0,   // when the program was cleared (synced as a tombstone)
+  resetAt: 0,            // last account reset (see lib/merge.js)
 
   setProgram(program) {
     const S = get()
@@ -172,13 +174,18 @@ export const useStore = create(persist((set, get) => ({
   /** Replace the synced part with a merged/imported document. */
   applyDoc(doc) {
     set({
-      program: doc.program ?? null,
+      program: doc.program?.deleted ? null : doc.program ?? null,
+      programClearedAt: doc.program?.deleted ? doc.program.updatedAt : get().programClearedAt,
+      resetAt: doc.resetAt ?? get().resetAt,
       sessions: doc.sessions || [],
       runs: doc.runs || [],
       bodyweight: doc.bodyweight || [],
       settings: doc.settings || get().settings
     })
   },
+
+  /** Remove the program; logged workouts, runs and bodyweight stay. */
+  clearProgram() { set({ program: null, programClearedAt: now(), active: null }) },
 
   resetAll() { set({ program: null, sessions: [], runs: [], bodyweight: [], settings: { unit: 'lb', blockStart: null, updatedAt: now() }, active: null }) }
 }), { name: 'overload_v1', version: 1 }))
