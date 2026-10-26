@@ -1,9 +1,9 @@
-// Renders the app icon (two stacked lime chevrons on near-black) to PNG without any
+// Renders the app icon (two stacked blue chevrons on dark grey) to PNG without any
 // dependencies, plus the matching SVG. Run: node scripts/make-icons.mjs
 import { writeFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 
-const BG = [12, 13, 16], FG = [196, 240, 66]
+const BG = [24, 25, 27], FG = [59, 130, 246]
 // Chevrons in a 0..1 unit square: each is two segments meeting at the apex.
 const CHEVRONS = [[0.27, 0.50, 0.50, 0.30, 0.73, 0.50], [0.27, 0.72, 0.50, 0.52, 0.73, 0.72]]
 const STROKE = 0.085

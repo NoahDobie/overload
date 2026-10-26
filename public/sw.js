@@ -3,7 +3,7 @@
 // cached shell; same-origin assets are cache-first (Vite hashes their names). Cross-origin
 // requests (Supabase) are never touched.
 
-const CACHE = 'overload-v1'
+const CACHE = 'overload-v2'
 const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png']
 
 self.addEventListener('install', e => {

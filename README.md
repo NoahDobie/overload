@@ -53,7 +53,10 @@ node scripts/make-icons.mjs   # regenerate the PWA icons
 1. **Supabase** (optional, needed for sync): create a free project. In the SQL Editor, run
    [`supabase/schema.sql`](supabase/schema.sql). Under Authentication → URL Configuration, set
    the Site URL to your Vercel URL and add it to Redirect URLs. Copy the Project URL and the
-   anon key from Project Settings → API.
+   anon key from Project Settings → API. In Authentication → Email Templates, add
+   `{{ .Token }}` to both the **Magic Link** and **Confirm signup** templates. The app asks for
+   that code, because on iPhone a home-screen app can't receive the email link (it opens in
+   Safari, which has separate storage).
 2. **Vercel**: push this repo to GitHub, then import it at vercel.com/new. Vite is detected
    automatically. Add the environment variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
    and deploy. Every push to `main` redeploys.

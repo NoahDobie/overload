@@ -12,9 +12,29 @@ const DEFAULTS = { sets: 3, rir: 2, increment: 5, startWeight: 0, hitsToProgress
 const num = v => (v === '' || v == null ? undefined : Number(v))
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-/** "8-10", "8–10", "8 to 10" or "8" → [min, max]. */
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const sorted = (a, b) => (a <= b ? [a, b] : [b, a])
+
+/** A range that a spreadsheet turned into a date ("3-5" → 5 Mar) → [min, max], or null. */
+function repRangeFromDate(v) {
+  if (v instanceof Date) return sorted(v.getMonth() + 1, v.getDate())
+  // Excel serial day numbers; no rep count gets anywhere near 10000
+  if (typeof v === 'number' && v >= 10000) {
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 864e5)
+    return sorted(d.getUTCMonth() + 1, d.getUTCDate())
+  }
+  // What Excel writes back to a CSV: "5-Mar", "Mar-5", "5 Mar"
+  const m = String(v).trim().toLowerCase().match(/^(\d{1,2})[\s-]([a-z]{3})[a-z]*$|^([a-z]{3})[a-z]*[\s-](\d{1,2})$/)
+  if (!m) return null
+  const month = MONTHS.indexOf(m[2] || m[3]) + 1
+  return month ? sorted(month, Number(m[1] || m[4])) : null
+}
+
+/** "8-10", "8–10", "8 to 10" or "8" → [min, max]. Undoes Excel's date conversion of "8-10". */
 export function parseRepRange(v) {
   if (v == null || v === '') return [undefined, undefined]
+  const fromDate = repRangeFromDate(v)
+  if (fromDate) return fromDate
   const m = String(v).match(/(\d+)\s*(?:-|–|—|to)\s*(\d+)/)
   if (m) return [Number(m[1]), Number(m[2])]
   const n = Number(v)
@@ -162,7 +182,8 @@ export async function importFile(file) {
     return normalizeProgram({ name, ...obj })
   }
   const XLSX = await import('xlsx')
-  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+  // raw: keep CSV cells as text, otherwise SheetJS reads "3-5" as a date
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: /\.csv$/i.test(file.name) })
   const sheetName = wb.SheetNames.find(n => !/^settings$/i.test(n)) || wb.SheetNames[0]
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' })
   const settingsSheet = wb.SheetNames.find(n => /^settings$/i.test(n))

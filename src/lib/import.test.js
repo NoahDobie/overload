@@ -39,6 +39,17 @@ describe('spreadsheet import', () => {
     expect(parseRepRange(5)).toEqual([5, 5])
   })
 
+  it('undoes Excel turning rep ranges into dates', () => {
+    expect(parseRepRange(36955)).toEqual([3, 5])       // 5 Mar 2001 serial
+    expect(parseRepRange(46086)).toEqual([3, 5])       // 5 Mar 2026 serial
+    expect(parseRepRange('5-Mar')).toEqual([3, 5])
+    expect(parseRepRange('12-Aug')).toEqual([8, 12])
+    expect(parseRepRange('Dec-15')).toEqual([12, 15])
+    expect(parseRepRange('3-May')).toEqual([3, 5])     // day-first locales
+    expect(parseRepRange(new Date(2026, 5, 10))).toEqual([6, 10])
+    expect(parseRepRange('10-120')).toEqual([10, 120])
+  })
+
   it('groups rows into ordered days and reads the Settings row', () => {
     const rows = [
       { Week: 'B', Day: 1, DayName: 'Push B', Exercise: 'Dip', Sets: 3, Reps: '6-10' },
@@ -80,6 +91,14 @@ describe('spreadsheet import', () => {
     const csv = 'Week,Day,DayName,Exercise,Sets,Reps\nA,1,Push A,Bench,3,6-8\nA,1,Push A,Fly,2,12-15\n'
     const res = await importFile({ name: 'p.csv', arrayBuffer: async () => new TextEncoder().encode(csv).buffer })
     expect(res.errors).toEqual([])
-    expect(res.program.days[0].exercises).toHaveLength(2)
+    expect(res.program.days[0].exercises.map(e => [e.sets, e.repMin, e.repMax])).toEqual([[3, 6, 8], [2, 12, 15]])
+  })
+
+  it('imports a CSV that Excel has re-saved with dates', async () => {
+    const csv = 'Week,Day,DayName,Exercise,Sets,Reps,RIR,Muscles\nA,1,Push 1,Flat Bench,4,5-Mar,1,"chest, triceps"\nA,1,Push 1,Lat Raise,3,12-Aug,0,shoulders\n'
+    const res = await importFile({ name: 'p.csv', arrayBuffer: async () => new TextEncoder().encode(csv).buffer })
+    expect(res.errors).toEqual([])
+    expect(res.program.days[0].exercises.map(e => [e.name, e.sets, e.repMin, e.repMax, e.rir])).toEqual([['Flat Bench', 4, 3, 5, 1], ['Lat Raise', 3, 8, 12, 0]])
+    expect(res.program.days[0].exercises[0].muscles).toEqual(['chest', 'triceps'])
   })
 })

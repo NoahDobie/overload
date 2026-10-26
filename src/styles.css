@@ -1,18 +1,18 @@
-/* Overload: dark-first, one accent, big touch targets. */
+/* Overload: dark grey first, one blue accent, big touch targets. */
 :root {
-  --bg: #0c0d10;
-  --surface: #15171c;
-  --surface-2: #1e2128;
-  --surface-3: #282c35;
-  --label: #f2f3f5;
-  --label-2: #a2a7b3;
-  --label-3: #6b7180;
-  --sep: #2a2e37;
-  --acc: #c4f042;
-  --acc-ink: #10140a;
-  --acc-soft: rgba(196, 240, 66, .14);
-  --run: #4cc9f0;
-  --run-soft: rgba(76, 201, 240, .15);
+  --bg: #18191b;
+  --surface: #222326;
+  --surface-2: #2c2d31;
+  --surface-3: #38393e;
+  --label: #f2f2f3;
+  --label-2: #a5a6ab;
+  --label-3: #707177;
+  --sep: #333439;
+  --acc: #3b82f6;
+  --acc-ink: #ffffff;
+  --acc-soft: rgba(59, 130, 246, .16);
+  --run: #3ccf7e;
+  --run-soft: rgba(60, 207, 126, .15);
   --deload: #b197fc;
   --deload-soft: rgba(177, 151, 252, .16);
   --danger: #ff6b6b;
@@ -23,19 +23,19 @@
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f4f4f1;
+    --bg: #f2f2f4;
     --surface: #ffffff;
-    --surface-2: #eeefeb;
-    --surface-3: #e2e3de;
-    --label: #121418;
-    --label-2: #5b606b;
-    --label-3: #9196a0;
-    --sep: #e3e4df;
-    --acc: #5a8f00;
+    --surface-2: #ebebee;
+    --surface-3: #dfdfe3;
+    --label: #151619;
+    --label-2: #5c5e66;
+    --label-3: #92949b;
+    --sep: #e0e0e4;
+    --acc: #1f6fe5;
     --acc-ink: #ffffff;
-    --acc-soft: rgba(90, 143, 0, .12);
-    --run: #0284c7;
-    --run-soft: rgba(2, 132, 199, .12);
+    --acc-soft: rgba(31, 111, 229, .12);
+    --run: #13945a;
+    --run-soft: rgba(19, 148, 90, .12);
     --deload: #7048e8;
     --deload-soft: rgba(112, 72, 232, .12);
     --danger: #d9363e;
@@ -192,7 +192,7 @@ input[type=checkbox]:checked::after { transform: translateX(20px); }
   width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--label-3);
   display: grid; place-items: center;
 }
-.run-pill.done .run-check { background: var(--run); border-color: var(--run); color: #04141c; }
+.run-pill.done .run-check { background: var(--run); border-color: var(--run); color: #06180e; }
 .run-l { font-weight: 700; font-size: 14.5px; }
 .run-s { font-size: 12px; color: var(--label-2); }
 
@@ -267,6 +267,8 @@ input[type=checkbox]:checked::after { transform: translateX(20px); }
 .dot.synced { background: var(--acc); }
 .dot.syncing { background: var(--warn); }
 .dot.error { background: var(--danger); }
+.dot.offline { background: var(--label-3); box-shadow: inset 0 0 0 2px var(--surface); outline: 1px solid var(--label-3); }
+button.link { background: none; border: 0; padding: 0; cursor: pointer; align-self: flex-start; }
 
 /* ---------- tab bar ---------- */
 .tabbar {

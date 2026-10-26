@@ -2,8 +2,11 @@
 // local-only and none of this runs.
 //
 // One row per user in `user_state` (see supabase/schema.sql), protected by row-level
-// security. On open/focus: pull, merge with the local copy (lib/merge.js), push the result.
-// After local changes: push, debounced.
+// security. On open/focus/reconnect: pull, merge with the local copy (lib/merge.js), push
+// the result. After local changes: the same, debounced. Failures retry with backoff.
+//
+// Sign-in emails carry both a link and a code. The code matters on iPhone: a home-screen
+// app has its own storage, and links from Mail open in Safari instead.
 
 import { createClient } from '@supabase/supabase-js'
 import { mergeDocs, syncedPart } from './merge.js'
@@ -19,7 +22,18 @@ export async function sendMagicLink(email) {
   if (error) throw error
 }
 
-export const signOut = () => supabase.auth.signOut()
+export async function verifyCode(email, token) {
+  const { error } = await supabase.auth.verifyOtp({ email, token: token.replace(/\s/g, ''), type: 'email' })
+  if (error) throw error
+}
+
+let signOutImpl = null
+
+/**
+ * Sync one last time, sign out and clear this device. Returns false (and stays signed in)
+ * when the final sync fails, unless force is set; unsynced changes would be lost.
+ */
+export const signOut = ({ force = false } = {}) => (signOutImpl ? signOutImpl(force) : supabase.auth.signOut().then(() => true))
 
 async function pull(userId) {
   const { data, error } = await supabase.from('user_state').select('doc').eq('user_id', userId).maybeSingle()
@@ -32,17 +46,33 @@ async function push(userId, doc) {
   if (error) throw error
 }
 
+const RETRY_MIN = 15e3, RETRY_MAX = 5 * 60e3
+
 /**
  * Wire the store to Supabase. Returns an unsubscribe function.
- * onStatus receives { user, state: 'idle'|'syncing'|'synced'|'error', error?, at? }.
+ * onStatus receives { user, state: 'idle'|'syncing'|'synced'|'offline'|'error', error?, at? }.
  */
 export function startSync(useStore, onStatus) {
   if (!supabase) return () => {}
-  let user = null, timer = null, applying = false, lastPushed = ''
+  let user = null, timer = null, retryTimer = null, backoff = 0, applying = false, lastPushed = '', inflight = null
   const status = s => onStatus({ user, ...s })
 
+  const scheduleRetry = () => {
+    clearTimeout(retryTimer)
+    backoff = Math.min(backoff ? backoff * 2 : RETRY_MIN, RETRY_MAX)
+    retryTimer = setTimeout(syncNow, backoff)
+  }
+
+  // One sync at a time; a caller arriving mid-sync waits, then runs its own pass.
   const syncNow = async () => {
-    if (!user) return
+    while (inflight) await inflight
+    inflight = runSync()
+    try { return await inflight } finally { inflight = null }
+  }
+
+  const runSync = async () => {
+    if (!user) return false
+    if (!navigator.onLine) { status({ state: 'offline' }); return false }   // the 'online' event resumes
     status({ state: 'syncing' })
     try {
       const local = syncedPart(useStore.getState())
@@ -56,11 +86,29 @@ export function startSync(useStore, onStatus) {
       }
       if (!remote || json !== JSON.stringify(syncedPart(remote))) await push(user.id, merged)
       lastPushed = json
+      backoff = 0
+      clearTimeout(retryTimer)
       status({ state: 'synced', at: Date.now() })
+      return true
     } catch (e) {
       applying = false
-      status({ state: 'error', error: e.message || String(e) })
+      if (!user) return false
+      status({ state: navigator.onLine ? 'error' : 'offline', error: e.message || String(e) })
+      scheduleRetry()
+      return false
     }
+  }
+
+  signOutImpl = async force => {
+    clearTimeout(timer)
+    if (user && !(await syncNow()) && !force) return false
+    clearTimeout(retryTimer)
+    user = null                                  // stop the store subscription before clearing
+    await supabase.auth.signOut({ scope: 'local' })
+    useStore.getState().resetAll()
+    lastPushed = ''
+    status({ state: 'idle' })
+    return true
   }
 
   const unsubStore = useStore.subscribe(S => {
@@ -75,17 +123,22 @@ export function startSync(useStore, onStatus) {
     const next = session?.user || null
     const changed = next?.id !== user?.id
     user = next
-    if (!user) { status({ state: 'idle' }); return }
+    if (!user) { clearTimeout(retryTimer); status({ state: 'idle' }); return }
     if (changed) syncNow()
   })
 
   const onFocus = () => { if (document.visibilityState === 'visible') syncNow() }
+  const onOnline = () => { backoff = 0; syncNow() }
   document.addEventListener('visibilitychange', onFocus)
+  window.addEventListener('online', onOnline)
 
   return () => {
     unsubStore()
     authSub.subscription.unsubscribe()
     document.removeEventListener('visibilitychange', onFocus)
+    window.removeEventListener('online', onOnline)
     clearTimeout(timer)
+    clearTimeout(retryTimer)
+    signOutImpl = null
   }
 }
