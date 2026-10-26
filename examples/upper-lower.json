@@ -1,0 +1,71 @@
+{
+  "name": "Upper / Lower",
+  "unit": "lb",
+  "block": {
+    "build": 3,
+    "deload": 1
+  },
+  "runs": {
+    "enabled": false,
+    "plan": [
+      { "id": "easy", "name": "Easy", "km": 5, "notes": "Conversational pace" },
+      { "id": "long", "name": "Long", "km": 10, "notes": "Easy pace, time on feet" }
+    ]
+  },
+  "days": [
+    {
+      "id": "A1",
+      "week": "A",
+      "name": "Upper 1",
+      "exercises": [
+        { "name": "Barbell Bench Press", "sets": 3, "reps": "5-8", "rir": 2, "increment": 5, "muscles": "chest, triceps, deltoids" },
+        { "name": "Barbell Bent Over Row", "sets": 3, "reps": "6-10", "rir": 2, "increment": 5, "muscles": "upper-back, biceps, forearm" },
+        { "name": "Dumbbell Seated Shoulder Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "muscles": "deltoids, triceps, upper-back" },
+        { "name": "Cable Pulldown", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "muscles": "upper-back, biceps, forearm" },
+        { "name": "Dumbbell Lateral Raise", "sets": 3, "reps": "12-15", "rir": 1, "increment": 5, "muscles": "deltoids, trapezius" },
+        { "name": "Cable Triceps Pushdown (V-Bar)", "sets": 2, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "triceps, forearm" },
+        { "name": "Dumbbell Biceps Curl", "sets": 2, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "biceps, forearm" }
+      ]
+    },
+    {
+      "id": "A2",
+      "week": "A",
+      "name": "Lower 1",
+      "exercises": [
+        { "name": "Barbell Squat", "sets": 3, "reps": "5-8", "rir": 2, "increment": 10, "muscles": "quadriceps, gluteal, hamstring" },
+        { "name": "Barbell Romanian Deadlift", "sets": 3, "reps": "8-10", "rir": 2, "increment": 10, "muscles": "gluteal, hamstring, lower-back" },
+        { "name": "Lever Leg Extension", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "quadriceps, hamstring" },
+        { "name": "Lever Lying Leg Curl", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "hamstring, calves" },
+        { "name": "Lever Standing Calf Raise", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "calves" },
+        { "name": "Cable Kneeling Crunch", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "abs, obliques" }
+      ]
+    },
+    {
+      "id": "A3",
+      "week": "A",
+      "name": "Upper 2",
+      "exercises": [
+        { "name": "Dumbbell Incline Bench Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "muscles": "chest, deltoids, triceps" },
+        { "name": "Pull-Up", "sets": 3, "reps": "6-10", "rir": 2, "increment": 0, "muscles": "upper-back, biceps, forearm" },
+        { "name": "Cable Seated Row", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "muscles": "upper-back, biceps, forearm" },
+        { "name": "Dumbbell Standing Overhead Press", "sets": 3, "reps": "8-12", "rir": 2, "increment": 5, "muscles": "deltoids, triceps, upper-back" },
+        { "name": "Cable Lateral Raise", "sets": 3, "reps": "12-15", "rir": 1, "increment": 2.5, "muscles": "deltoids, trapezius, triceps" },
+        { "name": "Cable Overhead Triceps Extension (Rope Attachment)", "sets": 2, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "triceps, deltoids" },
+        { "name": "Dumbbell Hammer Curl", "sets": 2, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "biceps, forearm" }
+      ]
+    },
+    {
+      "id": "A4",
+      "week": "A",
+      "name": "Lower 2",
+      "exercises": [
+        { "name": "Trap Bar Deadlift", "sets": 3, "reps": "4-6", "rir": 2, "increment": 10, "muscles": "gluteal, hamstring, quadriceps" },
+        { "name": "Dumbbell Bulgarian Split Squat", "sets": 3, "reps": "8-10", "rir": 2, "increment": 5, "muscles": "quadriceps, gluteal, hamstring" },
+        { "name": "Barbell Hip Thrust", "sets": 3, "reps": "8-12", "rir": 2, "increment": 10, "muscles": "gluteal, hamstring, quadriceps" },
+        { "name": "Lever Seated Leg Curl", "sets": 3, "reps": "10-15", "rir": 1, "increment": 5, "muscles": "hamstring, calves" },
+        { "name": "Lever Seated Calf Raise", "sets": 3, "reps": "12-15", "rir": 1, "increment": 5, "muscles": "calves" },
+        { "name": "Hanging Leg Raise", "sets": 3, "reps": "10-15", "rir": 1, "increment": 0, "muscles": "abs, hip-flexors" }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nextDayIndex, dayNumber } from './rotation.js'
-import { runsForWeek, weekStart } from './runs.js'
+import { runsForWeek, weekStart, normalizeRuns, programRuns, runKm, runName, runTarget, keepRunIds, MAX_RUNS } from './runs.js'
 import { avg7, weeklyChange } from './bodyweight.js'
 import { mergeDocs } from './merge.js'
 import { muscleLoad, levelsOf, normalizeMuscle } from './muscles.js'
@@ -29,15 +29,48 @@ describe('rotation', () => {
 describe('runs', () => {
   it('buckets Monday to Sunday', () => {
     expect(weekStart('2026-11-01')).toBe('2026-10-26')   // Sunday → previous Monday
+    const { plan } = programRuns({})
     const runs = [
-      { id: 1, date: '2026-10-26', type: 'easy' },
-      { id: 2, date: '2026-11-01', type: 'long' },
-      { id: 3, date: '2026-11-02', type: 'quality' },
-      { id: 4, date: '2026-10-28', type: 'quality', deleted: true }
+      { id: 1, date: '2026-10-26', type: 'easy', miles: 4 },                 // old record
+      { id: 2, date: '2026-11-01', planId: 'long', km: 12 },
+      { id: 3, date: '2026-11-02', planId: 'quality', km: 8 },               // next week
+      { id: 4, date: '2026-10-28', planId: 'quality', km: 8, deleted: true },
+      { id: 5, date: '2026-10-29', planId: 'gone', km: 3 }                   // no longer planned
     ]
-    const w = runsForWeek(runs, '2026-10-29')
+    const w = runsForWeek(runs, '2026-10-29', plan)
     expect(w.count).toBe(2)
-    expect(w.quality).toBeNull()
+    expect(w.done.quality).toBeUndefined()
+    expect(w.done.easy.id).toBe(1)
+    expect(w.km).toBe(21.4)                                                  // 6.4 + 12 + 3
+  })
+
+  it('normalizes run plans and converts the old miles targets', () => {
+    expect(programRuns({}).plan.map(p => p.id)).toEqual(['easy', 'quality', 'long'])
+    const old = programRuns({ runTargets: { long: { miles: 8, notes: 'easy pace' } } })
+    expect(old.plan[2]).toEqual({ id: 'long', name: 'Long', km: 12.9, notes: 'easy pace' })
+    const r = normalizeRuns({ enabled: false, plan: Array.from({ length: 9 }, (_, i) => ({ name: i ? '' : 'Tempo', km: i === 1 ? '5.5' : '' })) })
+    expect(r.enabled).toBe(false)
+    expect(r.plan).toHaveLength(MAX_RUNS)
+    expect(r.plan.slice(0, 2).map(p => [p.name, p.km])).toEqual([['Tempo', null], ['Run 2', 5.5]])
+    expect(new Set(r.plan.map(p => p.id)).size).toBe(MAX_RUNS)
+  })
+
+  it('ids come from names, and re-imports keep the current ids', () => {
+    expect(normalizeRuns({ plan: [{ name: 'Easy' }, { name: 'Easy' }] }).plan[0].id).toBe('easy')
+    const current = { enabled: true, plan: [{ id: 'abc123', name: 'Tempo', km: 8, notes: '' }] }
+    const next = normalizeRuns({ plan: [{ name: 'tempo ', km: 9 }, { name: 'Long', km: 14 }] })
+    expect(keepRunIds(next, current).plan.map(p => p.id)).toEqual(['abc123', 'long'])
+    expect(keepRunIds(undefined, current)).toBeUndefined()
+  })
+
+  it('names, distances and deload targets', () => {
+    expect(runKm({ km: 5 })).toBe(5)
+    expect(runKm({ miles: 5 })).toBe(8)
+    expect(runKm({})).toBeNull()
+    expect(runName({ type: 'long' })).toBe('Long')
+    expect(runName({ planId: 'x', name: 'Hill reps' })).toBe('Hill reps')
+    expect(runTarget({ km: 10, notes: 'z2' }, true)).toEqual({ km: 7, notes: 'z2' })
+    expect(runTarget({ km: null, notes: '' }, false)).toEqual({ km: null, notes: '' })
   })
 })
 

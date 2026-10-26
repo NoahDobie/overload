@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useStore, blockOf } from '../store.js'
 import { importFile, normalizeProgram, downloadXlsx } from '../lib/import.js'
 import { normalizeBlock, startDeloadNow, restartThisWeek, restartNextMonday } from '../lib/block.js'
 import { syncedPart, mergeDocs } from '../lib/merge.js'
 import { syncConfigured, sendMagicLink, verifyCode, signOut } from '../lib/sync.js'
 import { useSync } from '../syncStatus.js'
+import { programRuns, keepRunIds } from '../lib/runs.js'
 import { todayISO, fmtDate } from '../lib/util.js'
 import { Segmented, Sheet } from '../components/ui.jsx'
 import sample from '../../examples/program.json'
@@ -29,7 +31,12 @@ function ProgramSection() {
     if (!f) return
     try { setPreview(await importFile(f)) } catch (err) { setPreview({ program: null, errors: [err.message], warnings: [] }) }
   }
-  const apply = () => { setProgram(preview.program); setPreview(null) }
+  // A file that says nothing about runs keeps the current run plan.
+  const apply = () => {
+    const current = S.program ? programRuns(S.program) : undefined
+    setProgram({ ...preview.program, runs: keepRunIds(preview.program.runs, current) ?? current })
+    setPreview(null)
+  }
   const exportProgram = () => {
     const { updatedAt, ...p } = S.program
     download(`${p.name || 'program'}.json`, JSON.stringify(p, null, 2))
@@ -42,9 +49,9 @@ function ProgramSection() {
         ? <p><b>{S.program.name}</b><br /><span className="muted small">{S.program.days.length} days · {S.program.days.reduce((n, d) => n + d.exercises.length, 0)} exercises</span></p>
         : <p className="muted">No program loaded.</p>}
       <div className="btn-col">
-        <button className="btn primary" onClick={() => fileRef.current.click()}>Import JSON / Excel / CSV</button>
+        <Link className="btn primary" to="/program">{S.program ? 'Edit program' : 'Build a program'}</Link>
+        <button className="btn" onClick={() => fileRef.current.click()}>Import JSON / Excel / CSV</button>
         <input ref={fileRef} type="file" hidden accept=".json,.xlsx,.xls,.csv,application/json,text/csv" onChange={onFile} />
-        {!S.program && <button className="btn" onClick={() => setPreview(normalizeProgram(sample))}>Use sample PPLUL A/B</button>}
         {S.program && <div className="row gap">
           <button className="btn grow" onClick={() => downloadXlsx(S.program, `${S.program.name}.xlsx`)}>Export .xlsx</button>
           <button className="btn grow" onClick={exportProgram}>Export .json</button>
@@ -56,18 +63,22 @@ function ProgramSection() {
       </div>
       <details className="help">
         <summary>Spreadsheet format</summary>
-        <p className="small">One row per exercise. Columns: <code>Week</code> (A/B), <code>Day</code> (1–5), <code>DayName</code>, <code>Order</code>, <code>Exercise</code>, <code>Sets</code>, <code>Reps</code> (e.g. 8-10), <code>RIR</code>, <code>Increment</code>, <code>StartWeight</code>, <code>HitsToProgress</code>, <code>Muscles</code> (comma-separated), <code>Notes</code>.</p>
-        <p className="small">Optional sheet named <code>Settings</code>: <code>Build</code> (build weeks, 0 = no blocks), <code>Deload</code>, <code>RunEasyMiles</code>, <code>RunQualityMiles</code>, <code>RunLongMiles</code> and matching <code>…Notes</code>.</p>
+        <p className="small">One row per exercise. Columns: <code>Week</code> (A/B), <code>Day</code> (1–5), <code>DayName</code>, <code>Order</code>, <code>Exercise</code>, <code>Sets</code>, <code>Reps</code> (e.g. 8-10), <code>RIR</code>, <code>Increment</code>, <code>StartWeight</code>, <code>HitsToProgress</code>, <code>Muscles</code> (optional, comma-separated), <code>Notes</code>. Leave Muscles blank and they're filled in from the exercise library.</p>
+        <p className="small">Optional sheet named <code>Settings</code>: <code>Build</code> (build weeks, 0 = no blocks), <code>Deload</code>, <code>Runs</code> (on/off). Optional sheet named <code>Runs</code>, one row per weekly run: <code>Name</code>, <code>Km</code> (optional), <code>Notes</code>. Without them your current run plan is kept.</p>
         <p className="small">Progression: hit the top of the rep range on every set (<code>HitsToProgress</code> sessions in a row) and the weight goes up by <code>Increment</code>; otherwise beat last time by a rep. Leaving <code>Increment</code> at 0 means progress reps only.</p>
       </details>
 
       <Sheet open={!!preview} onClose={() => setPreview(null)} title={preview?.program ? `Import "${preview.program.name}"?` : 'Import failed'}>
         {preview?.errors?.length > 0 && <ul className="msgs err">{preview.errors.slice(0, 12).map((e, i) => <li key={i}>{e}</li>)}{preview.errors.length > 12 && <li>…and {preview.errors.length - 12} more</li>}</ul>}
         {preview?.warnings?.length > 0 && <ul className="msgs warn">{preview.warnings.slice(0, 8).map((e, i) => <li key={i}>{e}</li>)}</ul>}
+        {preview?.info?.length > 0 && <ul className="msgs info">{preview.info.map((e, i) => <li key={i}>{e}</li>)}</ul>}
         {preview?.program && <>
           <ul className="pv-days">
             {preview.program.days.map(d => <li key={d.id}><b>{d.week} · {d.name}</b> <span className="muted small">{d.exercises.map(e => e.name).join(', ')}</span></li>)}
           </ul>
+          <p className="muted small">{preview.program.runs
+            ? (preview.program.runs.enabled ? `Runs: ${preview.program.runs.plan.map(r => r.name + (r.km != null ? ` ${r.km} km` : '')).join(', ')}.` : 'Runs: off.')
+            : 'No runs in this file: your current run plan is kept.'}</p>
           <p className="muted small">Replaces the current program. Your logged history is kept: exercises with the same name continue their progression.</p>
           <button className="btn primary full" onClick={apply}>Import</button>
         </>}
@@ -98,7 +109,7 @@ function BlockSection() {
           Now: <b>{pos.isDeload ? 'Deload week' : `Week ${pos.week} of ${pos.length} (build)`}</b>
           {S.settings.blockStart && <span className="muted"> · block started {fmtDate(S.settings.blockStart)}</span>}
         </p>
-        <p className="small muted">Deload: {Math.round(b.liftDeload.setsFactor * 100)}% of sets at the same weight, RIR +{b.liftDeload.rirAdd}; runs at {Math.round(b.runDeloadFactor * 100)}% distance, quality swapped for strides.</p>
+        <p className="small muted">Deload: {Math.round(b.liftDeload.setsFactor * 100)}% of sets at the same weight, RIR +{b.liftDeload.rirAdd}; planned runs at {Math.round(b.runDeloadFactor * 100)}% distance, all easy.</p>
         <div className="btn-col">
           {!pos.isDeload && <button className="btn" onClick={() => setSettings({ blockStart: startDeloadNow(b, today) })}>Start deload this week</button>}
           <button className="btn" onClick={() => setSettings({ blockStart: restartThisWeek(today) })}>{pos.isDeload ? 'Skip deload: build week 1 now' : 'Restart block: this week is week 1'}</button>
@@ -193,8 +204,8 @@ function DataSection() {
       <Segmented value={S.settings.unit || 'lb'} onChange={unit => setSettings({ unit })} options={[{ value: 'lb', label: 'lb' }, { value: 'kg', label: 'kg' }]} />
       <div className="btn-col">
         <div className="row gap">
-          <button className="btn grow" onClick={backup}>Export backup</button>
-          <button className="btn grow" onClick={() => fileRef.current.click()}>Restore backup</button>
+          <button className="btn grow small nowrap" onClick={backup}>Export backup</button>
+          <button className="btn grow small nowrap" onClick={() => fileRef.current.click()}>Restore backup</button>
           <input ref={fileRef} type="file" hidden accept=".json,application/json" onChange={restore} />
         </div>
         <button className="btn ghost danger" onClick={() => { if (confirm('Erase everything on this device? Export a backup first if unsure.')) resetAll() }}>Erase all data on this device</button>

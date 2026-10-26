@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useStore, unitOf, blockOf, targetFor } from '../store.js'
 import { nextDayIndex, dayNumber } from '../lib/rotation.js'
-import { runsForWeek, RUN_TYPES } from '../lib/runs.js'
-import { runTarget } from '../lib/block.js'
+import { runsForWeek, programRuns, runTarget, runKm } from '../lib/runs.js'
+import { normalizeBlock } from '../lib/block.js'
 import { avg7, weeklyChange, sortedWeights } from '../lib/bodyweight.js'
 import { todayISO, fmtDate, fmtNum } from '../lib/util.js'
 import { Icon, Sheet } from '../components/ui.jsx'
@@ -19,62 +19,69 @@ function BlockBadge({ pos }) {
   )
 }
 
-function RunSheet({ type, existing, target, onClose }) {
+function RunSheet({ item, target, existing, onClose }) {
   const logRun = useStore(s => s.logRun)
   const deleteRun = useStore(s => s.deleteRun)
-  const [miles, setMiles] = useState(existing?.miles ?? target?.miles ?? '')
+  const [km, setKm] = useState(existing ? String(runKm(existing) ?? '') : '')
   const [minutes, setMinutes] = useState(existing?.minutes ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [date, setDate] = useState(existing?.date ?? todayISO())
-  const label = RUN_TYPES.find(t => t.id === type)?.label
-  const save = () => {
-    logRun({ id: existing?.id, type, date, miles: miles === '' ? null : Number(miles), minutes: minutes === '' ? null : Number(minutes), notes })
+  const ok = Number(km) > 0
+  const save = e => {
+    e.preventDefault()
+    if (!ok) return
+    logRun({ id: existing?.id, planId: item.id, name: item.name, date, km: Number(km), minutes: minutes === '' ? null : Number(minutes), notes })
     onClose()
   }
+  const plan = [target.km != null && `${fmtNum(target.km)} km`, target.notes].filter(Boolean).join(' · ')
   return (
-    <Sheet open onClose={onClose} title={`${label} run`}>
-      {target && <p className="muted small">Plan: {target.miles != null ? `${target.miles} mi` : ''}{target.miles != null && target.notes ? ' · ' : ''}{target.notes}</p>}
-      <div className="form-grid">
-        <label>Miles<input inputMode="decimal" value={miles} onChange={e => setMiles(e.target.value)} placeholder="optional" /></label>
+    <Sheet open onClose={onClose} title={item.name}>
+      {plan && <p className="muted small">Plan: {plan}</p>}
+      <form className="form-grid" onSubmit={save}>
+        <label>Distance (km)<input autoFocus inputMode="decimal" required value={km} onChange={e => setKm(e.target.value.replace(',', '.'))} placeholder={target.km != null ? `plan ${fmtNum(target.km)}` : 'km'} /></label>
         <label>Minutes<input inputMode="decimal" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="optional" /></label>
         <label className="span2">Date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-        <label className="span2">Notes<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="optional" /></label>
-      </div>
-      <div className="row gap">
-        {existing && <button className="btn ghost danger" onClick={() => { deleteRun(existing.id); onClose() }}>Undo</button>}
-        <button className="btn primary grow" onClick={save}>{existing ? 'Save' : 'Mark done'}</button>
-      </div>
+        <label className="span2">Notes<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="optional, e.g. felt easy, hilly" /></label>
+        <div className="row gap span2">
+          {existing && <button type="button" className="btn ghost danger" onClick={() => { deleteRun(existing.id); onClose() }}>Undo</button>}
+          <button className="btn primary grow" disabled={!ok}>{existing ? 'Save' : 'Mark done'}</button>
+        </div>
+      </form>
     </Sheet>
   )
 }
 
 function RunsCard({ S, pos }) {
   const [open, setOpen] = useState(null)
-  const week = runsForWeek(S.runs, todayISO())
+  const { enabled, plan } = programRuns(S.program)
+  if (!S.program || !enabled || !plan.length) return null
+  const factor = normalizeBlock(S.program.block).runDeloadFactor
+  const week = runsForWeek(S.runs, todayISO(), plan)
+  const item = plan.find(p => p.id === open)
   return (
     <section className="card">
       <div className="card-h">
         <h2><Icon name="run" size={18} /> Runs this week</h2>
-        <span className={'count' + (week.count === 3 ? ' full' : '')}>{week.count}/3</span>
+        <span className={'count' + (week.count === plan.length ? ' full' : '')}>{week.count}/{plan.length}{week.km ? ` · ${fmtNum(week.km)} km` : ''}</span>
       </div>
       <div className="runs">
-        {RUN_TYPES.map(t => {
-          const r = week[t.id]
-          const tgt = runTarget(S.program?.runTargets, t.id, pos.isDeload, S.program?.block)
+        {plan.map(p => {
+          const r = week.done[p.id]
+          const t = runTarget(p, pos.isDeload, factor)
           return (
-            <button key={t.id} className={'run-pill' + (r ? ' done' : '')} onClick={() => setOpen(t.id)}>
+            <button key={p.id} className={'run-pill' + (r ? ' done' : '')} onClick={() => setOpen(p.id)}>
               <span className="run-check">{r ? <Icon name="check" size={16} stroke={3} /> : null}</span>
-              <span className="run-l">{t.label}</span>
+              <span className="run-l">{p.name}</span>
               <span className="run-s">
-                {r ? [r.miles != null && `${fmtNum(r.miles)} mi`, r.minutes != null && `${fmtNum(r.minutes)} min`].filter(Boolean).join(' · ') || 'Done'
-                  : tgt?.miles != null ? `${tgt.miles} mi` : '—'}
+                {r ? [runKm(r) != null && `${fmtNum(runKm(r))} km`, r.minutes != null && `${fmtNum(r.minutes)} min`].filter(Boolean).join(' · ') || 'Done'
+                  : t.km != null ? `${fmtNum(t.km)} km` : ' '}
               </span>
             </button>
           )
         })}
       </div>
-      {pos.isDeload && <p className="muted small">Down week: shorter runs, quality → easy + strides.</p>}
-      {open && <RunSheet type={open} existing={week[open]} target={runTarget(S.program?.runTargets, open, pos.isDeload, S.program?.block)} onClose={() => setOpen(null)} />}
+      {pos.isDeload && <p className="muted small">Deload week: planned distances at {Math.round(factor * 100)}%, keep every run easy.</p>}
+      {item && <RunSheet item={item} target={runTarget(item, pos.isDeload, factor)} existing={week.done[item.id]} onClose={() => setOpen(null)} />}
     </section>
   )
 }
@@ -118,6 +125,7 @@ export default function Today() {
   const idx = pick ?? next
   const day = days[idx]
   const unit = unitOf(S)
+  const twoWeeks = new Set(days.map(d => d.week)).size > 1
 
   const begin = () => {
     if (S.active && S.active.dayId !== day.id && !confirm('Discard the workout in progress and start this one?')) return
@@ -138,8 +146,8 @@ export default function Today() {
       {!S.program ? (
         <section className="card hero empty-hero">
           <h2>No program yet</h2>
-          <p className="muted">Import your split from JSON or Excel, or start from the sample PPLUL A/B.</p>
-          <Link className="btn primary" to="/settings">Set up program</Link>
+          <p className="muted">Start from a template (Push/Pull/Legs, Upper/Lower or Full body) and make it yours, or import a spreadsheet in Settings.</p>
+          <Link className="btn primary" to="/program">Build a program</Link>
         </section>
       ) : (
         <>
@@ -150,7 +158,7 @@ export default function Today() {
             </button>
           )}
           <section className={'card hero' + (pos.isDeload ? ' is-deload' : '')}>
-            <p className="eyebrow">{idx === next ? 'Up next' : 'Picked'} · Week {day.week} · Day {dayNumber(days, idx)}</p>
+            <p className="eyebrow">{idx === next ? 'Up next' : 'Picked'}{twoWeeks ? ` · Week ${day.week}` : ''} · Day {dayNumber(days, idx)}</p>
             <h2 className="hero-title">{day.name}</h2>
             <ul className="preview">
               {day.exercises.map(ex => {
@@ -172,7 +180,7 @@ export default function Today() {
               if (!ds.length) return null
               return (
                 <div key={w} className="chips">
-                  <span className="chips-l">{w}</span>
+                  {twoWeeks && <span className="chips-l">{w}</span>}
                   {ds.map(([d, i]) => (
                     <button key={d.id} className={'chip' + (i === idx ? ' on' : '') + (i === next ? ' next' : '')} onClick={() => setPick(i === next ? null : i)}>{d.name}</button>
                   ))}

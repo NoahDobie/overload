@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import * as XLSX from 'xlsx'
-import { normalizeProgram, programFromRows, parseRepRange, programToRows, settingsToRow, importFile } from './import.js'
+import { normalizeProgram, programFromRows, parseRepRange, programToRows, settingsToRow, runsToRows, importFile } from './import.js'
 
 const example = JSON.parse(readFileSync(new URL('../../examples/program.json', import.meta.url), 'utf8'))
 
@@ -13,7 +13,7 @@ describe('JSON import', () => {
     expect(program.days).toHaveLength(10)
     expect(program.days[0].exercises[0]).toMatchObject({ name: 'Barbell Bench Press', repMin: 6, repMax: 8, increment: 5, muscles: ['chest', 'triceps', 'deltoids'] })
     expect(program.block).toMatchObject({ build: 3, deload: 1, enabled: true })
-    expect(program.runTargets.long.miles).toBe(8)
+    expect(program.runs.plan.map(r => [r.name, r.km])).toEqual([['Easy', 6], ['Quality', 8], ['Long', 13]])
   })
 
   it('fills defaults and reports bad rows without importing', () => {
@@ -58,13 +58,18 @@ describe('spreadsheet import', () => {
       { Week: 'A', Day: 1, Order: 1, Exercise: 'Bench', Sets: 4, RepMin: 5, RepMax: 8, Increment: 5, StartWeight: 185 },
       { Week: '', Day: '', Exercise: '' }
     ]
-    const { program, errors } = programFromRows(rows, { Build: 4, Deload: 1, RunLongMiles: 10 })
+    const { program, errors } = programFromRows(rows, { Build: 4, Deload: 1, RunLongMiles: 10 }, 'P', [{ Name: 'Tempo', Km: 8, Notes: '3×2 km' }, { Name: 'Long', Km: '' }])
     expect(errors).toEqual([])
     expect(program.days.map(d => d.name)).toEqual(['Push A', 'Pull A', 'Push B'])
     expect(program.days[0].exercises.map(e => e.name)).toEqual(['Bench', 'Fly'])
     expect(program.days[0].exercises[0]).toMatchObject({ sets: 4, repMin: 5, repMax: 8, startWeight: 185 })
     expect(program.block.build).toBe(4)
-    expect(program.runTargets.long.miles).toBe(10)
+    expect(program.runs).toMatchObject({ enabled: true, plan: [{ name: 'Tempo', km: 8, notes: '3×2 km' }, { name: 'Long', km: null }] })
+    // older Settings columns (miles) still import when there is no Runs sheet
+    expect(programFromRows(rows, { RunLongMiles: 10 }).program.runs.plan.find(r => r.id === 'long').km).toBe(16.1)
+    // nothing about runs: left out, so the current plan is kept
+    expect(programFromRows(rows, null).program.runs).toBeUndefined()
+    expect(programFromRows(rows, { Runs: 'off' }).program.runs.enabled).toBe(false)
   })
 
   it('reports row numbers', () => {
@@ -78,13 +83,14 @@ describe('spreadsheet import', () => {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(programToRows(program)), 'Program')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([settingsToRow(program)]), 'Settings')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(runsToRows(program)), 'Runs')
     const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
     const file = { name: 'plan.xlsx', arrayBuffer: async () => buf }
     const res = await importFile(file)
     expect(res.errors).toEqual([])
     expect(res.program.days.map(d => d.name)).toEqual(program.days.map(d => d.name))
     expect(res.program.days[2].exercises).toEqual(program.days[2].exercises)
-    expect(res.program.runTargets).toEqual(program.runTargets)
+    expect(res.program.runs).toEqual(program.runs)
   })
 
   it('imports CSV', async () => {

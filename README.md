@@ -1,19 +1,22 @@
 # Overload
 
 A small phone app (an installable PWA) that does one thing: it tells you what to lift today and
-what weight and reps to aim for, so you keep progressively overloading. It's built for a
-two-week PPLUL A/B rotation plus three runs a week (easy, quality, long), with planned deload
-weeks. It's a slimmed-down derivative of [openGym](https://github.com/DuarteSantos8/openGym).
+what weight and reps to aim for, so you keep progressively overloading. It works with any
+split (templates for PPLUL A/B, Upper/Lower and Full body) plus an optional weekly run checklist,
+with planned deload weeks. It's a slimmed-down derivative of [openGym](https://github.com/DuarteSantos8/openGym).
 
 - **Today**: shows which day of the rotation is next (it follows what you logged, not the
-  calendar), with per-exercise targets, this week's runs as checkboxes, and a quick bodyweight entry.
+  calendar), with per-exercise targets, this week's runs as a checklist, and a quick bodyweight entry.
+- **Runs** (optional, on/off in Edit program): up to 7 named runs a week, each with an optional
+  planned distance in km and notes. Marking one done asks for the distance you actually ran, plus
+  optional minutes and notes. The checklist resets every Monday.
 - **Workout**: set rows come prefilled with the target. Tap ✓ as you go and adjust with the ± buttons.
 - **Progression** (double progression): hit the top of the rep range on every set and the weight
   goes up by `Increment`. Otherwise, beat last time by a rep. Two sessions in a row under the
   range trigger a drop of 10%.
 - **Blocks**: 3 build weeks then 1 deload week by default (2:1–6:1 or off in Settings). In a deload
-  week you do half the sets at the same weight with RIR +2, and runs are cut to 70% with the
-  quality session swapped for strides. Deload sessions never count toward progression.
+  week you do half the sets at the same weight with RIR +2, and planned run distances are
+  cut to 70%. Deload sessions never count toward progression.
 - **History**: a lift/run heatmap with deload weeks marked, plus per-exercise charts (top set,
   estimated 1RM, volume).
 - **Body**: a bodyweight trend with a 7-day average, and a muscle map of recent training.
@@ -21,17 +24,29 @@ weeks. It's a slimmed-down derivative of [openGym](https://github.com/DuarteSant
 
 ## Programs
 
-Import from **Settings → Import**. JSON, `.xlsx` and `.csv` are accepted. Templates:
-[`examples/program.json`](examples/program.json), or download the Excel template from Settings.
+**Build or edit in the app:** Settings → **Edit program** (or **Build a program** on a fresh
+install). Start from a template (Push/Pull/Legs + Upper/Lower A/B, Upper/Lower 4×, Full body 3×, or
+blank), then add, remove, reorder and copy days and exercises. **Add exercise** searches about
+4,000 exercises from openGym's catalogue (`src/data/exercises.json`, rebuilt with
+`node scripts/build-exercises.mjs`), and each one comes with its muscles. If you rename an
+exercise that has logged history, saving asks whether to move the history to the new name.
 
-Spreadsheet format: one row per exercise.
+**Or import a file:** Settings → **Import**. JSON, `.xlsx` and `.csv` are accepted. Templates:
+[`examples/`](examples), or download the Excel template from Settings.
+
+Spreadsheet format: one row per exercise. `Muscles` is optional: blank ones are filled in by
+matching the exercise name against the library, and gym shorthand like DB, BB, OHP, RDL and
+"Lat Raise" is understood. The import preview says how many it filled in and lists any it
+couldn't match.
 
 | Week | Day | DayName | Order | Exercise | Sets | Reps | RIR | Increment | StartWeight | HitsToProgress | Muscles | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | A | 1 | Push A | 1 | Barbell Bench Press | 3 | 6-8 | 2 | 5 | 135 | 1 | chest, triceps | |
 
-There's also an optional sheet named `Settings` with these columns: `Build`, `Deload`,
-`RunEasyMiles`, `RunQualityMiles`, `RunLongMiles`, `RunEasyNotes`, and so on. Set `Increment`
+Optional sheets: `Settings` with `Build` (0 = no blocks), `Deload` and `Runs` (on/off), and
+`Runs` with one row per weekly run: `Name`, `Km` (optional), `Notes`. A file without run info
+keeps your current run plan. Older files with `RunEasyMiles`-style columns still import (converted
+to km). Set `Increment`
 to 0 for exercises where you progress by reps only. If a file has any invalid rows, none of it is
 imported, and you get a list of the errors by row number.
 

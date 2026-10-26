@@ -36,7 +36,11 @@ const ALIAS = {
   'lower back': 'lower-back', erectors: 'lower-back', spine: 'lower-back',
   glutes: 'gluteal', glute: 'gluteal', abductors: 'gluteal',
   quads: 'quadriceps', quad: 'quadriceps', hamstrings: 'hamstring', hams: 'hamstring',
-  adductor: 'adductors', 'hip flexors': 'hip-flexors', calf: 'calves', shins: 'tibialis', tibs: 'tibialis'
+  adductor: 'adductors', 'hip flexors': 'hip-flexors', calf: 'calves', shins: 'tibialis', tibs: 'tibialis',
+  // the openGym catalogue's vocabulary
+  'rear deltoids': 'deltoids', 'lower abs': 'abs', 'grip muscles': 'forearm', 'wrist flexors': 'forearm',
+  'wrist extensors': 'forearm', wrists: 'forearm', 'inner thighs': 'adductors', groin: 'adductors',
+  'levator scapulae': 'trapezius', soleus: 'calves', tibialis: 'tibialis', 'tibialis anterior': 'tibialis'
 }
 
 /** Map a free-text muscle name to a slug, or null. */

@@ -66,15 +66,3 @@ export function deloadTarget(ex, target, blockCfg) {
   }
 }
 
-/** Run target for a type this week, scaled down in a deload week. null when none is set. */
-export function runTarget(runTargets, type, isDeload, blockCfg) {
-  const t = runTargets?.[type]
-  const f = normalizeBlock(blockCfg).runDeloadFactor
-  const miles = t?.miles != null ? (isDeload ? Math.round(t.miles * f * 10) / 10 : t.miles) : null
-  let notes = t?.notes || ''
-  if (isDeload) {
-    notes = type === 'quality' ? 'Easy run + 4–6 strides' : type === 'long' ? 'Shorter, fully conversational' : 'Easy, keep it relaxed'
-  }
-  if (miles == null && !notes) return null
-  return { miles, notes }
-}

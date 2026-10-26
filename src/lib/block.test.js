@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { blockPosition, startDeloadNow, restartNextMonday, deloadTarget, runTarget } from './block.js'
+import { blockPosition, startDeloadNow, restartNextMonday, deloadTarget } from './block.js'
 
 const start = '2026-10-26'   // a Monday
 
@@ -44,13 +44,5 @@ describe('deload prescriptions', () => {
   it('halves sets (rounded up), holds weight, adds RIR', () => {
     const t = deloadTarget(ex, { weight: 140, reps: [8, 8, 8], kind: 'up', last: { sets: [{ w: 135, r: 10 }] } })
     expect(t).toMatchObject({ weight: 135, reps: [8, 8], rir: 4, kind: 'block-deload' })
-  })
-
-  it('scales run targets by 0.7 and swaps quality for strides', () => {
-    const rt = { long: { miles: 10 }, quality: { miles: 5, notes: '6x800' } }
-    expect(runTarget(rt, 'long', false)).toMatchObject({ miles: 10 })
-    expect(runTarget(rt, 'long', true)).toMatchObject({ miles: 7 })
-    expect(runTarget(rt, 'quality', true).notes).toMatch(/strides/)
-    expect(runTarget({}, 'easy', false)).toBeNull()
   })
 })

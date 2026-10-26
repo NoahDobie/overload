@@ -3,9 +3,12 @@
 
 import { normalizeMuscle } from './muscles.js'
 import { normalizeBlock } from './block.js'
+import { loadLibrary, fillMuscles } from './exercises.js'
+import { normalizeRuns, programRuns, MAX_RUNS } from './runs.js'
 
 export const SHEET_COLUMNS = ['Week', 'Day', 'DayName', 'Order', 'Exercise', 'Sets', 'Reps', 'RepMin', 'RepMax', 'RIR', 'Increment', 'StartWeight', 'HitsToProgress', 'Muscles', 'Notes']
-export const SETTINGS_COLUMNS = ['Build', 'Deload', 'RunEasyMiles', 'RunQualityMiles', 'RunLongMiles', 'RunEasyNotes', 'RunQualityNotes', 'RunLongNotes']
+export const SETTINGS_COLUMNS = ['Build', 'Deload', 'Runs']
+export const RUN_COLUMNS = ['Name', 'Km', 'Notes']
 
 const DEFAULTS = { sets: 3, rir: 2, increment: 5, startWeight: 0, hitsToProgress: 1 }
 
@@ -105,8 +108,12 @@ export function normalizeProgram(input) {
     name: String(src.name || 'My program'),
     unit: src.unit === 'kg' ? 'kg' : 'lb',
     days,
-    block: src.block === null || src.block === false ? { enabled: false } : normalizeBlock(src.block),
-    runTargets: src.runTargets || {}
+    block: src.block === null || src.block === false ? { enabled: false } : normalizeBlock(src.block)
+  }
+  // Left out when the source says nothing about runs, so an import keeps the current run plan.
+  if (src.runs != null || (src.runTargets && Object.keys(src.runTargets).length)) {
+    if (src.runs?.plan?.length > MAX_RUNS) warnings.push(`Only the first ${MAX_RUNS} runs are kept (max ${MAX_RUNS} a week)`)
+    program.runs = normalizeRuns(src.runs, src.runTargets)
   }
   const b = program.block
   if (b.enabled !== false && (!Number.isInteger(b.build) || b.build < 1 || !Number.isInteger(b.deload) || b.deload < 0)) {
@@ -117,8 +124,13 @@ export function normalizeProgram(input) {
 
 const lc = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [String(k).trim().toLowerCase().replace(/[\s_]/g, ''), typeof v === 'string' ? v.trim() : v]))
 
-/** Spreadsheet rows (objects keyed by header) → program. settingsRow is the optional Settings sheet. */
-export function programFromRows(rows, settingsRow, name = 'Imported program') {
+const ON = v => !/^(off|no|n|false|0)$/i.test(String(v ?? '').trim())
+
+/**
+ * Spreadsheet rows (objects keyed by header) → program. settingsRow is the optional Settings
+ * sheet; runRows the optional Runs sheet (Name, Km, Notes).
+ */
+export function programFromRows(rows, settingsRow, name = 'Imported program', runRows = null) {
   const errors = []
   const groups = new Map()
   rows.forEach((raw, i) => {
@@ -161,34 +173,60 @@ export function programFromRows(rows, settingsRow, name = 'Imported program') {
     if (s.build != null && s.build !== '') {
       program.block = Number(s.build) === 0 ? null : { build: Number(s.build), deload: num(s.deload) ?? 1 }
     }
+    // Older templates: RunEasyMiles, RunQualityNotes, ...
     const rt = {}
     for (const t of ['easy', 'quality', 'long']) {
       const miles = num(s[`run${t}miles`]), notes = s[`run${t}notes`]
       if (miles != null || notes) rt[t] = { ...(miles != null ? { miles } : {}), ...(notes ? { notes } : {}) }
     }
-    program.runTargets = rt
+    if (Object.keys(rt).length) program.runTargets = rt
+    if (s.runs != null && s.runs !== '') program.runs = { enabled: ON(s.runs), plan: programRuns(program).plan }
+  }
+  if (runRows) {
+    const plan = runRows.map(lc).filter(r => r.name || r.km).map(r => ({ name: r.name, km: r.km, notes: r.notes }))
+    program.runs = { enabled: settingsRow && lc(settingsRow).runs != null && lc(settingsRow).runs !== '' ? ON(lc(settingsRow).runs) : true, plan }
   }
   if (!program.days.length && !errors.length) errors.push('No exercise rows found')
   const res = normalizeProgram(program)
   return { ...res, program: errors.length ? null : res.program, errors: [...errors, ...res.errors] }
 }
 
-/** Read a File (json/xlsx/xls/csv) into { program, errors, warnings }. */
+/**
+ * Fill in muscles for exercises imported without any, from the exercise library.
+ * Adds an info line (how many were filled) and a warning naming any it could not place.
+ */
+export async function withMuscles(res) {
+  if (!res.program) return res
+  const blank = res.program.days.reduce((n, d) => n + d.exercises.filter(e => !e.muscles.length).length, 0)
+  if (!blank) return res
+  const missed = fillMuscles(res.program, await loadLibrary())
+  const left = res.program.days.reduce((n, d) => n + d.exercises.filter(e => !e.muscles.length).length, 0)
+  const filled = blank - left
+  const info = [...(res.info || [])]
+  if (filled) info.push(`Muscles filled in from the exercise library for ${filled} exercise${filled === 1 ? '' : 's'}. To choose them yourself, add a Muscles column.`)
+  const warnings = [...res.warnings]
+  if (missed.length) warnings.push(`No muscles found for: ${missed.join(', ')}. Add a Muscles column to set them.`)
+  return { ...res, info, warnings }
+}
+
+/** Read a File (json/xlsx/xls/csv) into { program, errors, warnings, info }. */
 export async function importFile(file) {
   const name = file.name.replace(/\.[^.]+$/, '')
   if (/\.json$/i.test(file.name)) {
     let obj
     try { obj = JSON.parse(await file.text()) } catch (e) { return { program: null, errors: ['Not valid JSON: ' + e.message], warnings: [] } }
-    return normalizeProgram({ name, ...obj })
+    return withMuscles(normalizeProgram({ name, ...obj }))
   }
   const XLSX = await import('xlsx')
   // raw: keep CSV cells as text, otherwise SheetJS reads "3-5" as a date
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: /\.csv$/i.test(file.name) })
-  const sheetName = wb.SheetNames.find(n => !/^settings$/i.test(n)) || wb.SheetNames[0]
+  const sheetName = wb.SheetNames.find(n => !/^(settings|runs)$/i.test(n)) || wb.SheetNames[0]
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' })
   const settingsSheet = wb.SheetNames.find(n => /^settings$/i.test(n))
   const settingsRow = settingsSheet ? XLSX.utils.sheet_to_json(wb.Sheets[settingsSheet], { defval: '' })[0] : null
-  return programFromRows(rows, settingsRow, name)
+  const runsSheet = wb.SheetNames.find(n => /^runs$/i.test(n))
+  const runRows = runsSheet ? XLSX.utils.sheet_to_json(wb.Sheets[runsSheet], { defval: '' }) : null
+  return withMuscles(programFromRows(rows, settingsRow, name, runRows))
 }
 
 /** The program as spreadsheet rows (for the Excel template and export). */
@@ -203,13 +241,10 @@ export function programToRows(program) {
 
 export function settingsToRow(program) {
   const b = program.block || {}
-  const rt = program.runTargets || {}
-  return {
-    Build: b.enabled === false ? 0 : b.build ?? 3, Deload: b.deload ?? 1,
-    RunEasyMiles: rt.easy?.miles ?? '', RunQualityMiles: rt.quality?.miles ?? '', RunLongMiles: rt.long?.miles ?? '',
-    RunEasyNotes: rt.easy?.notes ?? '', RunQualityNotes: rt.quality?.notes ?? '', RunLongNotes: rt.long?.notes ?? ''
-  }
+  return { Build: b.enabled === false ? 0 : b.build ?? 3, Deload: b.deload ?? 1, Runs: programRuns(program).enabled ? 'on' : 'off' }
 }
+
+export const runsToRows = program => programRuns(program).plan.map(p => ({ Name: p.name, Km: p.km ?? '', Notes: p.notes }))
 
 /** Build and download an .xlsx of a program (used for the template). */
 export async function downloadXlsx(program, filename) {
@@ -217,5 +252,6 @@ export async function downloadXlsx(program, filename) {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(programToRows(program), { header: SHEET_COLUMNS }), 'Program')
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([settingsToRow(program)], { header: SETTINGS_COLUMNS }), 'Settings')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(runsToRows(program), { header: RUN_COLUMNS }), 'Runs')
   XLSX.writeFile(wb, filename)
 }

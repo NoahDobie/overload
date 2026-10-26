@@ -2,10 +2,13 @@
   "name": "PPLUL A/B",
   "unit": "lb",
   "block": { "build": 3, "deload": 1 },
-  "runTargets": {
-    "easy": { "miles": 4, "notes": "Zone 2, conversational" },
-    "quality": { "miles": 5, "notes": "Tempo or intervals" },
-    "long": { "miles": 8, "notes": "Easy pace, time on feet" }
+  "runs": {
+    "enabled": true,
+    "plan": [
+      { "id": "easy", "name": "Easy", "km": 6, "notes": "Zone 2, conversational" },
+      { "id": "quality", "name": "Quality", "km": 8, "notes": "Tempo or intervals" },
+      { "id": "long", "name": "Long", "km": 13, "notes": "Easy pace, time on feet" }
+    ]
   },
   "days": [
     { "id": "A1", "week": "A", "name": "Push A", "exercises": [

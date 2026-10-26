@@ -12,7 +12,12 @@ const PATHS = {
   back: 'M15 5l-7 7 7 7',
   run: 'M13 4a1.6 1.6 0 1 0 0 .1M9 20l2.5-5 3 2V21M7 11l3-3 3 1.5 2 3 3 .5M11.5 15L10 10',
   trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
-  chev: 'M9 6l6 6-6 6'
+  chev: 'M9 6l6 6-6 6',
+  up: 'M6 15l6-6 6 6',
+  down: 'M6 9l6 6 6-6',
+  copy: 'M9 9h10v10H9zM5 15V5h10',
+  search: 'M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4',
+  grip: 'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01'
 }
 
 export function Icon({ name, size = 22, stroke = 2 }) {

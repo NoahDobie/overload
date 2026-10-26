@@ -5,7 +5,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { uid, todayISO } from './lib/util.js'
-import { historyFor, nextTarget } from './lib/progression.js'
+import { historyFor, nextTarget, exKey } from './lib/progression.js'
 import { blockPosition, deloadTarget, restartThisWeek } from './lib/block.js'
 
 const now = () => Date.now()
@@ -21,6 +21,12 @@ export function targetFor(S, ex, isDeload) {
 }
 
 const touch = x => ({ ...x, updatedAt: now() })
+
+// A workout left untouched this long is treated as abandoned: on return the app asks to save
+// or discard it instead of jumping back in.
+export const STALE_WORKOUT_MS = 4 * 60 * 60 * 1000
+export const lastActivity = a => Math.max(a.startedAt || 0, a.touchedAt || 0, a.lastSetAt || 0)
+export const isStale = (a, at = now()) => !!a && at - lastActivity(a) > STALE_WORKOUT_MS
 
 export const useStore = create(persist((set, get) => ({
   program: null,
@@ -75,7 +81,8 @@ export const useStore = create(persist((set, get) => ({
           : j > si && 'w' in patch && !s.done ? { ...s, w: patch.w }
             : s)
     })
-    set({ active: { ...a, entries } })
+    const t = now()
+    set({ active: { ...a, entries, touchedAt: t, ...(patch.done ? { lastSetAt: t } : {}) } })
   },
 
   addSet(ei) {
@@ -86,13 +93,13 @@ export const useStore = create(persist((set, get) => ({
       const last = e.sets[e.sets.length - 1] || { w: e.target.weight, r: e.target.reps[0] }
       return { ...e, sets: [...e.sets, { w: last.w, r: last.r, done: false }] }
     })
-    set({ active: { ...a, entries } })
+    set({ active: { ...a, entries, touchedAt: now() } })
   },
 
   removeSet(ei) {
     const a = get().active
     if (!a) return
-    set({ active: { ...a, entries: a.entries.map((e, i) => (i === ei && e.sets.length > 1 ? { ...e, sets: e.sets.slice(0, -1) } : e)) } })
+    set({ active: { ...a, touchedAt: now(), entries: a.entries.map((e, i) => (i === ei && e.sets.length > 1 ? { ...e, sets: e.sets.slice(0, -1) } : e)) } })
   },
 
   setActiveDeload(deload) {
@@ -108,7 +115,7 @@ export const useStore = create(persist((set, get) => ({
       const target = targetFor(S, ex, deload)
       return { ...e, target, sets: target.reps.map(r => ({ w: target.weight, r, done: false })) }
     })
-    set({ active: { ...a, deload, entries } })
+    set({ active: { ...a, deload, entries, touchedAt: now() } })
   },
 
   finishWorkout() {
@@ -116,7 +123,8 @@ export const useStore = create(persist((set, get) => ({
     if (!a) return
     const session = {
       id: a.id, dayId: a.dayId, date: a.date, deload: !!a.deload,
-      durationMin: Math.round((now() - a.startedAt) / 60000),
+      // Until the last ticked set, so time away from the app after it doesn't count.
+      durationMin: Math.round(((a.lastSetAt > a.startedAt ? a.lastSetAt : now()) - a.startedAt) / 60000),
       entries: a.entries.map(e => ({ exId: e.exId, name: e.name, sets: e.sets.map(({ w, r, done }) => ({ w: Number(w) || 0, r: Number(r) || 0, done })) })),
       updatedAt: now()
     }
@@ -125,13 +133,16 @@ export const useStore = create(persist((set, get) => ({
 
   discardWorkout() { set({ active: null }) },
 
+  /** Mark the workout in progress as current again (after "Keep going"). */
+  touchWorkout() { const a = get().active; if (a) set({ active: { ...a, touchedAt: now() } }) },
+
   deleteSession(id) {
     set({ sessions: get().sessions.map(s => (s.id === id ? { id, deleted: true, updatedAt: now() } : s)) })
   },
 
   logRun(run) {
     const runs = get().runs
-    const rec = touch({ id: run.id || uid(), date: run.date || todayISO(), type: run.type, miles: run.miles ?? null, minutes: run.minutes ?? null, notes: run.notes || '' })
+    const rec = touch({ id: run.id || uid(), date: run.date || todayISO(), planId: run.planId, name: run.name, km: run.km ?? null, minutes: run.minutes ?? null, notes: run.notes || '' })
     set({ runs: runs.some(r => r.id === rec.id) ? runs.map(r => (r.id === rec.id ? rec : r)) : [...runs, rec] })
   },
 
@@ -146,6 +157,17 @@ export const useStore = create(persist((set, get) => ({
   },
 
   deleteWeight(id) { set({ bodyweight: get().bodyweight.map(e => (e.id === id ? { id, deleted: true, updatedAt: now() } : e)) }) },
+
+  /** Move logged history to new exercise names: { oldName: newName }. */
+  renameHistory(renames) {
+    const to = Object.fromEntries(Object.entries(renames).map(([a, b]) => [exKey(a), b]))
+    const fix = entries => entries.map(e => (to[exKey(e.name)] ? { ...e, name: to[exKey(e.name)] } : e))
+    const S = get()
+    set({
+      sessions: S.sessions.map(s => (s.deleted || !s.entries?.some(e => to[exKey(e.name)]) ? s : { ...s, entries: fix(s.entries), updatedAt: now() })),
+      active: S.active ? { ...S.active, entries: fix(S.active.entries) } : S.active
+    })
+  },
 
   /** Replace the synced part with a merged/imported document. */
   applyDoc(doc) {
