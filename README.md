@@ -18,7 +18,10 @@ with planned deload weeks. It's a slimmed-down derivative of [openGym](https://g
   week you do half the sets at the same weight with RIR +2, and planned run distances are
   cut to 70%. Deload sessions never count toward progression.
 - **History**: a lift/run heatmap with deload weeks marked, plus per-exercise charts (top set,
-  estimated 1RM, volume).
+  estimated 1RM, volume). Any logged workout can be edited (weights, reps, ticks, date) and next
+  targets follow straight away.
+- **Units**: lb or kg. Switching converts every logged and planned weight, and maps increments
+  to the matching plate step (5 lb → 2.5 kg).
 - **Body**: a bodyweight trend with a 7-day average, and a muscle map of recent training.
 - Data is stored on the device first, and it works offline. Sync through Supabase is optional.
 
@@ -59,6 +62,7 @@ carries on.
 npm install
 npm run dev      # http://localhost:5173
 npm test         # vitest: progression, blocks, rotation, import, merge, …
+npm run e2e      # Playwright at phone size in your installed Edge, against a fake Supabase
 npm run build
 node scripts/make-icons.mjs   # regenerate the PWA icons
 ```
@@ -77,9 +81,12 @@ node scripts/make-icons.mjs   # regenerate the PWA icons
    and deploy. Every push to `main` redeploys.
 3. On your phone, open the URL, then Share → **Add to Home Screen**.
 
-Friends can use the same URL. They sign in with their own email and get their own data, which
-row-level security keeps separate. Once everyone has joined, you can turn off new sign-ups in
-Supabase (Authentication → Providers → Email). Free Supabase projects pause after a week with no
+Accounts are invite-only: the app never creates an account on sign-in, so turn off "Allow new
+users to sign up" in Supabase (Authentication → Sign In / Providers → Email) and add people
+with Authentication → Users → Invite user. Each person gets their own data, which row-level
+security keeps separate, capped at 1 MB per account (`doc_max_1mb` in `supabase/schema.sql`).
+Supabase's built-in email only reaches your project's team members, so inviting others needs
+custom SMTP. Free Supabase projects pause after a week with no
 traffic. Regular use keeps yours awake, and a paused project can be resumed from the dashboard.
 
 Without the Supabase variables, the app runs in local-only mode. Use **Export backup** in

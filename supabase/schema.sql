@@ -20,3 +20,7 @@ create policy "own row: update" on public.user_state
 
 create policy "own row: delete" on public.user_state
   for delete using ((select auth.uid()) = user_id);
+
+-- Keep any one account's document to 1 MB (years of training are well under that).
+alter table public.user_state
+  add constraint doc_max_1mb check (pg_column_size(doc) <= 1048576);

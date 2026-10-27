@@ -18,8 +18,14 @@ export const supabase = URL_ && KEY ? createClient(URL_, KEY) : null
 export const syncConfigured = !!supabase
 
 export async function sendMagicLink(email) {
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin } })
-  if (error) throw error
+  // Only existing accounts can sign in; new ones are invited from the Supabase dashboard.
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin, shouldCreateUser: false } })
+  if (error) {
+    if (error.code === 'otp_disabled' || /signups? not allowed|user not found/i.test(error.message)) {
+      throw new Error('No account for this email. Ask the owner to invite you.')
+    }
+    throw error
+  }
 }
 
 export async function verifyCode(email, token) {
@@ -54,7 +60,11 @@ async function pull(userId) {
 
 async function push(userId, doc) {
   const { error } = await supabase.from('user_state').upsert({ user_id: userId, doc, updated_at: new Date().toISOString() })
-  if (error) throw error
+  if (error) {
+    // doc_max_1mb in supabase/schema.sql
+    if (error.code === '23514' || /doc_max_1mb/.test(error.message)) throw new Error('Your data is over the 1 MB limit. Export a backup and contact the owner.')
+    throw error
+  }
 }
 
 const RETRY_MIN = 15e3, RETRY_MAX = 5 * 60e3

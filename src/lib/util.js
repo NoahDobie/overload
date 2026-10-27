@@ -30,3 +30,12 @@ export const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a
 
 /** Epley estimated one-rep max. */
 export const e1rm = (w, r) => (r > 0 && w > 0 ? w * (1 + r / 30) : 0)
+
+/** Save text as a file download. */
+export const download = (name, text, type = 'application/json') => {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([text], { type }))
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+}

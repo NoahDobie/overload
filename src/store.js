@@ -22,6 +22,28 @@ export function targetFor(S, ex, isDeload) {
 
 const touch = x => ({ ...x, updatedAt: now() })
 
+// lb ↔ kg. Weights keep one decimal; increments map to the matching plate step.
+export const LB_PER_KG = 2.20462262
+const STEP_LB_TO_KG = { 1.25: 0.5, 2.5: 1.25, 5: 2.5, 10: 5, 20: 10 }
+const STEP_KG_TO_LB = { 0.5: 1.25, 1.25: 2.5, 2.5: 5, 5: 10, 10: 20 }
+const half = n => Math.round(n * 2) / 2
+export function convertWeight(w, to) {
+  const n = Number(w)
+  if (!n) return w
+  return Math.round((to === 'kg' ? n / LB_PER_KG : n * LB_PER_KG) * 10) / 10
+}
+export function convertStep(step, to) {
+  const n = Number(step) || 0
+  if (!n) return 0
+  const table = to === 'kg' ? STEP_LB_TO_KG : STEP_KG_TO_LB
+  return table[n] ?? Math.max(0.5, half(to === 'kg' ? n / LB_PER_KG : n * LB_PER_KG))
+}
+/** Whether anything has a weight that a unit switch would convert. */
+export const hasWeights = S =>
+  (S.sessions || []).some(s => !s.deleted && s.entries?.some(e => e.sets.some(x => Number(x.w)))) ||
+  (S.bodyweight || []).some(b => !b.deleted) ||
+  !!S.program?.days.some(d => d.exercises.some(e => Number(e.startWeight)))
+
 // A workout left untouched this long is treated as abandoned: on return the app asks to save
 // or discard it instead of jumping back in.
 export const STALE_WORKOUT_MS = 4 * 60 * 60 * 1000
@@ -138,6 +160,16 @@ export const useStore = create(persist((set, get) => ({
   /** Mark the workout in progress as current again (after "Keep going"). */
   touchWorkout() { const a = get().active; if (a) set({ active: { ...a, touchedAt: now() } }) },
 
+  /** Fix a logged workout: date, deload flag and its sets. Next targets follow immediately. */
+  updateSession(id, { date, deload, entries }) {
+    set({
+      sessions: get().sessions.map(x => (x.id !== id || x.deleted ? x : touch({
+        ...x, date, deload: !!deload,
+        entries: entries.map(e => ({ ...e, sets: e.sets.map(({ w, r, done }) => ({ w: Number(w) || 0, r: Number(r) || 0, done: !!done })) }))
+      })))
+    })
+  },
+
   deleteSession(id) {
     set({ sessions: get().sessions.map(s => (s.id === id ? { id, deleted: true, updatedAt: now() } : s)) })
   },
@@ -181,6 +213,27 @@ export const useStore = create(persist((set, get) => ({
       runs: doc.runs || [],
       bodyweight: doc.bodyweight || [],
       settings: doc.settings || get().settings
+    })
+  },
+
+  /** Switch units and convert every logged and planned weight to them. Runs (km) are untouched. */
+  convertUnits(to) {
+    const S = get()
+    if (unitOf(S) === to) return
+    const cw = w => convertWeight(w, to)
+    const sets = list => list.map(x => ({ ...x, w: cw(x.w) }))
+    set({
+      sessions: S.sessions.map(s => (s.deleted ? s : touch({ ...s, entries: s.entries.map(e => ({ ...e, sets: sets(e.sets) })) }))),
+      bodyweight: S.bodyweight.map(b => (b.deleted ? b : touch({ ...b, weight: cw(b.weight) }))),
+      program: S.program && touch({
+        ...S.program, unit: to,
+        days: S.program.days.map(d => ({ ...d, exercises: d.exercises.map(e => ({ ...e, startWeight: cw(e.startWeight), increment: convertStep(e.increment, to) })) }))
+      }),
+      active: S.active && {
+        ...S.active,
+        entries: S.active.entries.map(e => ({ ...e, sets: sets(e.sets), target: e.target && { ...e.target, weight: cw(e.target.weight) } }))
+      },
+      settings: touch({ ...S.settings, unit: to })
     })
   },
 

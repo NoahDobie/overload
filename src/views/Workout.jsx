@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, unitOf, blockOf } from '../store.js'
 import { fmtNum } from '../lib/util.js'
-import { Icon, Stepper } from '../components/ui.jsx'
+import { Icon } from '../components/ui.jsx'
+import SetTable from '../components/SetTable.jsx'
 
 function Elapsed({ since }) {
   const [, tick] = useState(0)
@@ -30,22 +31,8 @@ function ExerciseCard({ entry, ei, ex, unit }) {
       </p>
       <p className="reason">{t.reason}</p>
       {ex?.notes && <p className="muted small">{ex.notes}</p>}
-      <div className="sets">
-        <div className="set-h"><span>Set</span><span>{unit}</span><span>Reps</span><span /></div>
-        {entry.sets.map((s, si) => (
-          <div key={si} className={'set' + (s.done ? ' done' : '')}>
-            <span className="set-n">{si + 1}</span>
-            <Stepper label={`set ${si + 1} weight`} value={s.w} step={ex?.increment || 5} max={999} width={56} onChange={w => updateSet(ei, si, { w })} />
-            <Stepper label={`set ${si + 1} reps`} value={s.r} step={1} max={99} width={26} compact onChange={r => updateSet(ei, si, { r })} />
-            <button className="tick" aria-label={s.done ? `Undo set ${si + 1}` : `Done set ${si + 1}`} aria-pressed={s.done}
-              onClick={() => updateSet(ei, si, { done: !s.done })}><Icon name="check" size={20} stroke={3} /></button>
-          </div>
-        ))}
-      </div>
-      <div className="row gap end">
-        <button className="btn ghost small" onClick={() => removeSet(ei)} disabled={entry.sets.length <= 1}><Icon name="minus" size={14} /> Set</button>
-        <button className="btn ghost small" onClick={() => addSet(ei)}><Icon name="plus" size={14} /> Set</button>
-      </div>
+      <SetTable sets={entry.sets} unit={unit} step={ex?.increment || 5}
+        onSet={(si, patch) => updateSet(ei, si, patch)} onAdd={() => addSet(ei)} onRemove={() => removeSet(ei)} />
     </section>
   )
 }

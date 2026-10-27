@@ -28,7 +28,10 @@ function SessionRow({ s, dayName, unit }) {
               <span className="muted">{e.sets.filter(x => x.done).map(x => `${fmtNum(x.w)}×${x.r}`).join(', ') || '—'} {unit}</span>
             </p>
           ))}
-          <button className="btn ghost danger small" onClick={() => { if (confirm('Delete this session?')) del(s.id) }}><Icon name="trash" size={14} /> Delete</button>
+          <div className="row gap">
+            <Link className="btn ghost small" to={`/session/${s.id}`}>Edit</Link>
+            <button className="btn ghost danger small" onClick={() => { if (confirm('Delete this session?')) del(s.id) }}><Icon name="trash" size={14} /> Delete</button>
+          </div>
         </div>
       )}
     </li>

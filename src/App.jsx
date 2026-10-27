@@ -12,6 +12,7 @@ import ExerciseDetail from './views/ExerciseDetail.jsx'
 import Body from './views/Body.jsx'
 import Settings from './views/Settings.jsx'
 import ProgramEditor from './views/ProgramEditor.jsx'
+import SessionEditor from './views/SessionEditor.jsx'
 
 const TABS = [
   { to: '/', icon: 'today', label: 'Today' },
@@ -22,7 +23,7 @@ const TABS = [
 
 function TabBar() {
   const { pathname } = useLocation()
-  if (pathname === '/workout' || pathname === '/program') return null
+  if (pathname === '/workout' || pathname === '/program' || pathname.startsWith('/session/')) return null
   return (
     <nav className="tabbar">
       {TABS.map(t => (
@@ -98,6 +99,7 @@ export default function App() {
           <Route path="/body" element={<Body />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/program" element={<ProgramEditor />} />
+          <Route path="/session/:id" element={<SessionEditor />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

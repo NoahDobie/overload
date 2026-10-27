@@ -7,7 +7,7 @@ import { loadLibrary, fillMuscles } from './exercises.js'
 import { normalizeRuns, programRuns, MAX_RUNS } from './runs.js'
 import { historyFor, exKey } from './progression.js'
 
-export const SHEET_COLUMNS = ['Week', 'Day', 'DayName', 'Order', 'Exercise', 'Sets', 'Reps', 'RepMin', 'RepMax', 'RIR', 'Increment', 'StartWeight', 'HitsToProgress', 'Muscles', 'Notes']
+export const SHEET_COLUMNS = ['Week', 'Day', 'DayName', 'Order', 'Exercise', 'Sets', 'Reps', 'RIR', 'Increment', 'StartWeight', 'HitsToProgress', 'Muscles', 'Notes']
 export const SETTINGS_COLUMNS = ['Build', 'Deload', 'Runs']
 export const RUN_COLUMNS = ['Name', 'Km', 'Notes']
 
@@ -259,7 +259,7 @@ export function programToRows(program) {
   return program.days.flatMap(d => d.exercises.map((e, i) => ({
     Week: d.week, Day: d.id.slice(d.week.length) || String(i + 1), DayName: d.name, Order: i + 1,
     Exercise: e.name, Sets: e.sets, Reps: e.repMin === e.repMax ? String(e.repMin) : `${e.repMin}-${e.repMax}`,
-    RepMin: '', RepMax: '', RIR: e.rir, Increment: e.increment, StartWeight: e.startWeight,
+    RIR: e.rir, Increment: e.increment, StartWeight: e.startWeight,
     HitsToProgress: e.hitsToProgress, Muscles: (e.muscles || []).join(', '), Notes: e.notes || ''
   })))
 }

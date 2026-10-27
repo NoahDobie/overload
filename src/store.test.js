@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // zustand's persist middleware wants localStorage
 globalThis.localStorage ??= { _m: new Map(), getItem(k) { return this._m.get(k) ?? null }, setItem(k, v) { this._m.set(k, String(v)) }, removeItem(k) { this._m.delete(k) } }
-const { useStore, isStale, lastActivity, STALE_WORKOUT_MS } = await import('./store.js')
+const { useStore, isStale, lastActivity, STALE_WORKOUT_MS, convertWeight, convertStep, hasWeights } = await import('./store.js')
 
 describe('renameHistory', () => {
   beforeEach(() => useStore.getState().resetAll())
@@ -73,5 +73,61 @@ describe('clearProgram', () => {
     expect(S.active).toBeNull()
     expect(S.programClearedAt).toBeGreaterThan(0)
     expect(S.sessions).toHaveLength(1)
+  })
+})
+
+describe('updateSession', () => {
+  it('fixes a typo, keeps the session, and the next target follows', async () => {
+    const { targetFor } = await import('./store.js')
+    useStore.getState().resetAll()
+    const ex = { id: 'b', name: 'Bench', sets: 1, repMin: 3, repMax: 5, rir: 1, increment: 5, startWeight: 0, muscles: [] }
+    useStore.getState().setProgram({ name: 'P', days: [{ id: 'A1', week: 'A', name: 'Push', exercises: [ex] }] })
+    useStore.setState({ sessions: [{ id: 's1', dayId: 'A1', date: '2026-10-25', updatedAt: 1, entries: [{ exId: 'b', name: 'Bench', sets: [{ w: 2500, r: 5, done: true }] }] }] })
+    expect(targetFor(useStore.getState(), ex, false).weight).toBe(2505)
+    const s = useStore.getState().sessions[0]
+    useStore.getState().updateSession('s1', { ...s, date: '2026-10-24', entries: [{ ...s.entries[0], sets: [{ w: '250', r: '5', done: true }] }] })
+    const after = useStore.getState().sessions[0]
+    expect(after).toMatchObject({ id: 's1', date: '2026-10-24', deload: false })
+    expect(after.entries[0].sets[0]).toEqual({ w: 250, r: 5, done: true })
+    expect(after.updatedAt).toBeGreaterThan(1)
+    expect(targetFor(useStore.getState(), ex, false).weight).toBe(255)
+  })
+})
+
+describe('convertUnits', () => {
+  it('converts weights and maps increments to plate steps', () => {
+    expect(convertWeight(225, 'kg')).toBe(102.1)
+    expect(convertWeight(100, 'lb')).toBe(220.5)
+    expect(convertWeight(0, 'kg')).toBe(0)
+    expect([2.5, 5, 10, 7].map(s => convertStep(s, 'kg'))).toEqual([1.25, 2.5, 5, 3])
+    expect([1.25, 2.5, 5, 0].map(s => convertStep(s, 'lb'))).toEqual([2.5, 5, 10, 0])
+  })
+
+  it('converts sessions, bodyweight, program and the workout in progress', () => {
+    useStore.getState().resetAll()
+    useStore.getState().setProgram({ name: 'P', unit: 'lb', days: [{ id: 'A1', week: 'A', name: 'Push', exercises: [{ id: 'b', name: 'Bench', sets: 1, repMin: 3, repMax: 5, rir: 1, increment: 5, startWeight: 250, muscles: [] }] }] })
+    useStore.setState({
+      sessions: [{ id: 's1', dayId: 'A1', date: '2026-10-25', updatedAt: 1, entries: [{ exId: 'b', name: 'Bench', sets: [{ w: 225, r: 5, done: true }] }] }],
+      bodyweight: [{ id: 'w', date: '2026-10-25', weight: 180, updatedAt: 1 }],
+      runs: [{ id: 'r', date: '2026-10-25', planId: 'easy', km: 6, updatedAt: 1 }]
+    })
+    useStore.getState().startWorkout('A1')
+    expect(hasWeights(useStore.getState())).toBe(true)
+    useStore.getState().convertUnits('kg')
+    const S = useStore.getState()
+    expect(S.settings.unit).toBe('kg')
+    expect(S.program.unit).toBe('kg')
+    expect(S.sessions[0].entries[0].sets[0].w).toBe(102.1)
+    expect(S.sessions[0].updatedAt).toBeGreaterThan(1)
+    expect(S.bodyweight[0].weight).toBe(81.6)
+    expect(S.runs[0].km).toBe(6)
+    expect(S.program.days[0].exercises[0]).toMatchObject({ startWeight: 113.4, increment: 2.5 })
+    // in progress: last 225 × 5 hit the top of 3-5, so the target was 230 lb
+    expect(S.active.entries[0].target.weight).toBe(104.3)
+    expect(S.active.entries[0].sets[0].w).toBe(104.3)
+    // and back again lands close to where it started
+    useStore.getState().convertUnits('lb')
+    expect(useStore.getState().sessions[0].entries[0].sets[0].w).toBe(225.1)
+    expect(useStore.getState().program.days[0].exercises[0].increment).toBe(5)
   })
 })
