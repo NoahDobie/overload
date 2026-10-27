@@ -5,8 +5,8 @@
 // security. On open/focus/reconnect: pull, merge with the local copy (lib/merge.js), push
 // the result. After local changes: the same, debounced. Failures retry with backoff.
 //
-// Sign-in emails carry both a link and a code. The code matters on iPhone: a home-screen
-// app has its own storage, and links from Mail open in Safari instead.
+// Sign-in is by emailed link. On iPhone the link opens in Safari, which has separate storage
+// from a home-screen install, so sign in where the link opens (Android shares Chrome's).
 
 import { createClient } from '@supabase/supabase-js'
 import { mergeDocs, syncedPart } from './merge.js'
@@ -26,11 +26,6 @@ export async function sendMagicLink(email) {
     }
     throw error
   }
-}
-
-export async function verifyCode(email, token) {
-  const { error } = await supabase.auth.verifyOtp({ email, token: token.replace(/\s/g, ''), type: 'email' })
-  if (error) throw error
 }
 
 let signOutImpl = null

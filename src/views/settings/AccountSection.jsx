@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { syncConfigured, sendMagicLink, verifyCode, signOut, resetAccount } from '../../lib/sync.js'
+import { syncConfigured, sendMagicLink, signOut, resetAccount } from '../../lib/sync.js'
 import { useSync } from '../../syncStatus.js'
 
 export default function AccountSection() {
   const sync = useSync()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
-  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   if (!syncConfigured) {
@@ -19,11 +18,7 @@ export default function AccountSection() {
   }
   const send = async e => {
     e.preventDefault(); setErr('')
-    try { await sendMagicLink(email); setSent(true); setCode('') } catch (x) { setErr(x.message) }
-  }
-  const verify = async e => {
-    e.preventDefault(); setErr(''); setBusy(true)
-    try { await verifyCode(email, code) } catch (x) { setErr(x.message) } finally { setBusy(false) }
+    try { await sendMagicLink(email); setSent(true) } catch (x) { setErr(x.message) }
   }
   const out = async () => {
     setBusy(true)
@@ -55,17 +50,12 @@ export default function AccountSection() {
         <p className="small muted">Signing out removes your data from this device. It stays in your account.</p>
         <button className="btn ghost danger" onClick={reset} disabled={busy}>Erase everything in my account</button>
       </> : sent ? <>
-        <p className="small">We emailed <b>{email}</b> a code. Enter it here, or open the link in the email on this device.</p>
-        <form className="row gap" onSubmit={verify}>
-          <input className="grow" inputMode="numeric" autoComplete="one-time-code" required minLength={6} maxLength={12}
-            placeholder="Code" value={code} onChange={e => setCode(e.target.value)} />
-          <button className="btn primary" disabled={busy}>Verify</button>
-        </form>
+        <p className="small">Check <b>{email}</b> for a sign-in link. Open it on this device.</p>
         <button className="link small" onClick={() => { setSent(false); setErr('') }}>Use a different email</button>
       </> : (
         <form className="row gap" onSubmit={send}>
           <input className="grow" type="email" required placeholder="you@email.com" value={email} onChange={e => setEmail(e.target.value)} />
-          <button className="btn primary">Send code</button>
+          <button className="btn primary">Send link</button>
         </form>
       )}
       {err && <p className="small err-t">{err}</p>}

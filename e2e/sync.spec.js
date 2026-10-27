@@ -1,23 +1,23 @@
 import { test, expect } from '@playwright/test'
-import { freshApp, buildFrom, state, fakeAccount, mockSupabase, signIn, refocus } from './helpers.js'
+import { freshApp, buildFrom, state, fakeAccount, mockSupabase, signIn, refocus, magicLink } from './helpers.js'
 
-test('sign in with a code; unknown emails are turned away', async ({ page, context }) => {
+test('sign in by link; unknown emails are turned away', async ({ page, context }) => {
   const acct = fakeAccount()
   await mockSupabase(context, acct)
   await buildFrom(page, 'Upper / Lower')
   await page.getByPlaceholder('you@email.com').fill('stranger@example.com')
-  await page.getByRole('button', { name: 'Send code' }).click()
+  await page.getByRole('button', { name: 'Send link' }).click()
   await expect(page.getByText('No account for this email. Ask the owner to invite you.')).toBeVisible()
   expect(acct.lastOtp.create_user).toBe(false)
 
   await page.getByPlaceholder('you@email.com').fill('me@example.com')
-  await page.getByRole('button', { name: 'Send code' }).click()
-  await page.getByPlaceholder('Code').fill('000000')
-  await page.getByRole('button', { name: 'Verify' }).click()
-  await expect(page.getByText(/expired or is invalid/)).toBeVisible()
-  await page.getByPlaceholder('Code').fill('123 456')
-  await page.getByRole('button', { name: 'Verify' }).click()
+  await page.getByRole('button', { name: 'Send link' }).click()
+  await expect(page.getByText('Check me@example.com for a sign-in link. Open it on this device.')).toBeVisible()
+  await expect(page.getByPlaceholder('Code')).toHaveCount(0)
+  await page.goto(magicLink(acct))
+  await page.goto('/settings')
   await page.getByText(/^Synced /).waitFor()
+  await expect(page.getByText('Signed in as')).toContainText('me@example.com')
   expect(acct.doc.program.name).toBe('Upper / Lower')
 })
 
@@ -25,7 +25,7 @@ test('offline changes save locally and sync on reconnect; sign-out guards unsync
   const acct = fakeAccount()
   await mockSupabase(context, acct)
   await buildFrom(page, 'Upper / Lower')
-  await signIn(page)
+  await signIn(page, acct)
   const pushes = acct.pushes
 
   await context.setOffline(true)
@@ -62,7 +62,7 @@ test('offline changes save locally and sync on reconnect; sign-out guards unsync
   expect(S.bodyweight).toHaveLength(0)
   expect(acct.doc.bodyweight.some(b => b.weight == 180)).toBe(true)
 
-  await signIn(page)
+  await signIn(page, acct)
   expect((await state(page)).program.name).toBe('Upper / Lower')
 })
 
@@ -82,12 +82,12 @@ test('two devices: clear program, then erase the account', async ({ browser }) =
   await phone.page.getByRole('button', { name: /^Upper \/ Lower/ }).click()
   await phone.page.getByRole('button', { name: 'Save', exact: true }).click()
   await phone.page.waitForURL('**/settings')
-  await signIn(phone.page)
+  await signIn(phone.page, acct)
   await phone.page.getByRole('link', { name: 'Today' }).click()
   await phone.page.getByPlaceholder(/Today's weight/).fill('180')
   await phone.page.getByRole('button', { name: 'Log' }).click()
   await phone.page.waitForTimeout(2600)
-  await signIn(laptop.page)
+  await signIn(laptop.page, acct)
   expect((await state(laptop.page)).program.name).toBe('Upper / Lower')
 
   // clear program on the phone reaches the laptop; history stays

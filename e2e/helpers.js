@@ -73,7 +73,7 @@ const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url')
 /**
  * A fake Supabase account. Pass the same account to several browser contexts to act as
  * several signed-in devices. account.doc is the server copy; account.pushes counts uploads.
- * The sign-in code is 123456; account.knownEmails decides which emails may sign in.
+ * account.knownEmails decides which emails may sign in; signIn() follows the emailed link.
  */
 export function fakeAccount(email = 'me@example.com') {
   const user = { id: '33333333-3333-3333-3333-333333333333', email, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() }
@@ -91,10 +91,6 @@ export async function mockSupabase(context, account) {
       if (!account.knownEmails.has(account.lastOtp.email)) return json(422, { code: 422, error_code: 'otp_disabled', msg: 'Signups not allowed for otp' })
       return json(200, {})
     }
-    if (url.pathname.endsWith('/auth/v1/verify')) {
-      if (req.postDataJSON().token !== '123456') return json(403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' })
-      return json(200, { access_token: account.jwt, token_type: 'bearer', expires_in: 3600, expires_at: account.exp, refresh_token: 'r', user: account.user })
-    }
     if (url.pathname.endsWith('/auth/v1/user')) return json(200, account.user)
     if (url.pathname.endsWith('/auth/v1/logout')) return route.fulfill({ status: 204 })
     if (url.pathname.endsWith('/rest/v1/user_state')) {
@@ -111,13 +107,18 @@ export async function mockSupabase(context, account) {
   })
 }
 
-/** Sign in through Settings with the fake account's code. */
-export async function signIn(page, email = 'me@example.com') {
+/** The link in the sign-in email: back to the app with the session in the URL hash. */
+export const magicLink = account =>
+  `/#access_token=${account.jwt}&expires_at=${account.exp}&expires_in=3600&refresh_token=r&token_type=bearer&type=magiclink`
+
+/** Request a link through Settings, then open it, as tapping it in the email does. */
+export async function signIn(page, account) {
   await page.goto('/settings')
-  await page.getByPlaceholder('you@email.com').fill(email)
-  await page.getByRole('button', { name: 'Send code' }).click()
-  await page.getByPlaceholder('Code').fill('123456')
-  await page.getByRole('button', { name: 'Verify' }).click()
+  await page.getByPlaceholder('you@email.com').fill(account.user.email)
+  await page.getByRole('button', { name: 'Send link' }).click()
+  await page.getByText(/for a sign-in link/).waitFor()
+  await page.goto(magicLink(account))
+  await page.goto('/settings')
   await page.getByText(/^Synced /).waitFor()
 }
 
