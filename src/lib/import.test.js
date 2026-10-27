@@ -125,3 +125,24 @@ describe('renamedFrom', () => {
     expect(JSON.stringify(withoutRenames(program))).not.toMatch(/renamedFrom/)
   })
 })
+
+describe('deload columns and pasted JSON', () => {
+  it('round-trips the deload settings through the Settings sheet', () => {
+    const rows = [{ Week: 'A', Day: 1, Exercise: 'Bench', Reps: '5-8' }]
+    const { program } = programFromRows(rows, { Build: 4, Deload: 2, DeloadSets: '66%', DeloadWeight: 90, DeloadRIR: 3, DeloadRun: 50 })
+    expect(program.block).toMatchObject({ build: 4, deload: 2, liftDeload: { setsFactor: 0.66, weightFactor: 0.9, rirAdd: 3 }, runDeloadFactor: 0.5 })
+    expect(settingsToRow(program)).toMatchObject({ Build: 4, Deload: 2, DeloadSets: 66, DeloadWeight: 90, DeloadRIR: 3, DeloadRun: 50 })
+    // left out: the usual deload
+    expect(programFromRows(rows, { Build: 3 }).program.block.liftDeload).toEqual({ setsFactor: 0.5, rirAdd: 2, weightFactor: 1 })
+  })
+
+  it('pulls the program out of a pasted AI reply', async () => {
+    const { importJsonText } = await import('./import.js')
+    const reply = 'Here you go!\n```json\n{ "name": "UL", "days": [{ "name": "Upper", "exercises": [{ "name": "Bench", "reps": "6-8", "muscles": "chest" }] }] }\n```\nEnjoy {:'
+    const res = await importJsonText(reply)
+    expect(res.errors).toEqual([])
+    expect(res.program).toMatchObject({ name: 'UL', days: [{ name: 'Upper', exercises: [{ name: 'Bench', repMin: 6, repMax: 8 }] }] })
+    expect((await importJsonText('sure: { "days": [{ "name": "X", "exercises": [{ "name": "Curl", "reps": 10, "muscles": "biceps" }] }] }')).errors).toEqual([])
+    expect((await importJsonText('no json here')).errors[0]).toMatch(/Not valid JSON/)
+  })
+})

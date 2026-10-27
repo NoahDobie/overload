@@ -7,10 +7,15 @@ import { persist } from 'zustand/middleware'
 import { uid, todayISO } from './lib/util.js'
 import { historyFor, nextTarget, exKey } from './lib/progression.js'
 import { blockPosition, deloadTarget, restartThisWeek } from './lib/block.js'
+import { programRuns } from './lib/runs.js'
+import { BODYWEIGHT_EQUIPMENT, MAX_GUESSED_MUSCLES } from './lib/exercises.js'
 
 const now = () => Date.now()
 
 export const unitOf = S => S.settings?.unit || S.program?.unit || 'lb'
+
+/** Unit runs are shown and typed in ('km' or 'mi'); they are always stored in km. */
+export const runUnitOf = S => (S.settings?.runUnit === 'mi' ? 'mi' : 'km')
 
 export const blockOf = (S, iso = todayISO()) => blockPosition(S.program?.block, S.settings?.blockStart, iso)
 
@@ -75,6 +80,15 @@ export const useStore = create(persist((set, get) => ({
     if (p) set({ program: touch({ ...p, block: { ...p.block, ...patch } }) })
   },
 
+  setRuns(patch) {
+    const p = get().program
+    if (!p) return
+    const runs = { ...programRuns(p), ...patch }
+    // Switching runs on with nothing planned starts with one easy run, as the editor does.
+    if (runs.enabled && !runs.plan.length) runs.plan = [{ id: uid(), name: 'Easy', km: null, notes: '' }]
+    set({ program: touch({ ...p, runs }) })
+  },
+
   startWorkout(dayId) {
     const S = get()
     const day = S.program?.days.find(d => d.id === dayId)
@@ -126,6 +140,43 @@ export const useStore = create(persist((set, get) => ({
     set({ active: { ...a, touchedAt: now(), entries: a.entries.map((e, i) => (i === ei && e.sets.length > 1 ? { ...e, sets: e.sets.slice(0, -1) } : e)) } })
   },
 
+  /**
+   * Add an exercise to today's workout only (the program is unchanged). One the program has
+   * elsewhere keeps its prescription; a new one gets the editor's defaults. Either way the
+   * target follows its own logged history.
+   */
+  addEntry(pick) {
+    const S = get()
+    const a = S.active
+    if (!a) return
+    const known = S.program?.days.flatMap(d => d.exercises).find(x => exKey(x.name) === exKey(pick.name))
+    const bodyweight = pick.equipment && BODYWEIGHT_EQUIPMENT.has(pick.equipment)
+    const ex = known
+      ? { ...known }
+      : { name: pick.name, sets: 3, repMin: 8, repMax: 12, rir: 2, increment: bodyweight ? 0 : unitOf(S) === 'kg' ? 2.5 : 5, startWeight: 0, hitsToProgress: 1 }
+    const target = targetFor(S, ex, !!a.deload)
+    const entry = {
+      exId: 'x-' + uid(), name: known?.name || pick.name, adhoc: ex,
+      muscles: (known?.muscles?.length ? known.muscles : pick.muscles || []).slice(0, MAX_GUESSED_MUSCLES),
+      target, sets: target.reps.map(r => ({ w: target.weight, r, done: false }))
+    }
+    set({ active: { ...a, entries: [...a.entries, entry], touchedAt: now() } })
+  },
+
+  /** Skip (or un-skip) an exercise for today: it is left out of the count and of the saved session. */
+  skipEntry(ei, skipped = true) {
+    const a = get().active
+    if (!a) return
+    set({ active: { ...a, touchedAt: now(), entries: a.entries.map((e, i) => (i === ei ? { ...e, skipped } : e)) } })
+  },
+
+  /** Take an added exercise back out of today's workout. */
+  removeEntry(ei) {
+    const a = get().active
+    if (!a) return
+    set({ active: { ...a, touchedAt: now(), entries: a.entries.filter((_, i) => i !== ei) } })
+  },
+
   setActiveDeload(deload) {
     const S = get()
     const a = S.active
@@ -134,7 +185,7 @@ export const useStore = create(persist((set, get) => ({
     if (!day) return
     // Re-prescribe sets that have not been touched yet.
     const entries = a.entries.map(e => {
-      const ex = day.exercises.find(x => x.id === e.exId)
+      const ex = day.exercises.find(x => x.id === e.exId) || e.adhoc
       if (!ex || e.sets.some(s => s.done)) return e
       const target = targetFor(S, ex, deload)
       return { ...e, target, sets: target.reps.map(r => ({ w: target.weight, r, done: false })) }
@@ -149,7 +200,10 @@ export const useStore = create(persist((set, get) => ({
       id: a.id, dayId: a.dayId, date: a.date, deload: !!a.deload,
       // Until the last ticked set, so time away from the app after it doesn't count.
       durationMin: Math.round(((a.lastSetAt > a.startedAt ? a.lastSetAt : now()) - a.startedAt) / 60000),
-      entries: a.entries.map(e => ({ exId: e.exId, name: e.name, sets: e.sets.map(({ w, r, done }) => ({ w: Number(w) || 0, r: Number(r) || 0, done })) })),
+      entries: a.entries.filter(e => !e.skipped && e.sets.length).map(e => ({
+        exId: e.exId, name: e.name, ...(e.muscles?.length ? { muscles: e.muscles } : {}),
+        sets: e.sets.map(({ w, r, done }) => ({ w: Number(w) || 0, r: Number(r) || 0, done }))
+      })),
       updatedAt: now()
     }
     set({ sessions: [...get().sessions, session], active: null })

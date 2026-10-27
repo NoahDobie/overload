@@ -40,6 +40,9 @@ const VARIANT = new Set(['lying', 'kneeling', 'alternate', 'alternating', 'singl
 const COMMON = new Set(['barbell', 'dumbbell', 'cable', 'leverage machine', 'smith machine', 'body weight', 'ez barbell', 'weighted', 'trap bar', 'landmine'])
 const CLASSIC = new Set(['barbell', 'dumbbell', 'cable', 'lever', 'smith'])
 export const MAX_GUESSED_MUSCLES = 3
+
+/** Library equipment that means bodyweight: these progress by reps (Increment 0). */
+export const BODYWEIGHT_EQUIPMENT = new Set(['body weight', 'assisted', 'suspension trainer'])
 const STOP = new Set(['with', 'the', 'a', 'on', 'and', 'of', 'to', 'v'])
 const stem = w => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
 

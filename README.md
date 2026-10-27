@@ -7,21 +7,26 @@ with planned deload weeks. It's a slimmed-down derivative of [openGym](https://g
 
 - **Today**: shows which day of the rotation is next (it follows what you logged, not the
   calendar), with per-exercise targets, this week's runs as a checklist, and a quick bodyweight entry.
-- **Runs** (optional, on/off in Edit program): up to 7 named runs a week, each with an optional
+- **Runs** (optional, on/off in Settings → Training or Edit program): up to 7 named runs a week, each with an optional
   planned distance in km and notes. Marking one done asks for the distance you actually ran, plus
   optional minutes and notes. The checklist resets every Monday.
 - **Workout**: set rows come prefilled with the target. Tap ✓ as you go and adjust with the ± buttons.
+  **Skip today** sets an exercise aside (it isn't saved, and its next target is unchanged), and
+  **Add exercise** adds one for this session only: it keeps its own progression by name, and the
+  program doesn't change.
 - **Progression** (double progression): hit the top of the rep range on every set and the weight
   goes up by `Increment`. Otherwise, beat last time by a rep. Two sessions in a row under the
   range trigger a drop of 10%.
 - **Blocks**: 3 build weeks then 1 deload week by default (2:1–6:1 or off in Settings). In a deload
   week you do half the sets at the same weight with RIR +2, and planned run distances are
-  cut to 70%. Deload sessions never count toward progression.
+  cut to 70%. **Customize deload** in Settings changes the length (1–2 weeks), sets, weight, extra
+  RIR and run distance. Deload sessions never count toward progression.
 - **History**: a lift/run heatmap with deload weeks marked, plus per-exercise charts (top set,
   estimated 1RM, volume). Any logged workout can be edited (weights, reps, ticks, date) and next
   targets follow straight away.
 - **Units**: lb or kg. Switching converts every logged and planned weight, and maps increments
-  to the matching plate step (5 lb → 2.5 kg).
+  to the matching plate step (5 lb → 2.5 kg). Runs are shown in km or miles (Settings → Data, km by default);
+  distances are always stored in km, so switching converts nothing.
 - **Body**: a bodyweight trend with a 7-day average, and a muscle map of recent training.
 - Data is stored on the device first, and it works offline. Sync through Supabase is optional.
 
@@ -33,6 +38,11 @@ blank), then add, remove, reorder and copy days and exercises. **Add exercise** 
 4,000 exercises from openGym's catalogue (`src/data/exercises.json`, rebuilt with
 `node scripts/build-exercises.mjs`), and each one comes with its muscles. If you rename an
 exercise that has logged history, saving asks whether to move the history to the new name.
+
+**Or ask an AI:** Settings → **Build with AI** → **Copy AI prompt**, paste it into any AI chat, answer
+its questions, then **Paste program** with its reply. The prompt explains the JSON format and
+includes your current program, so the AI can change it rather than starting over. You see the
+usual import preview before anything changes.
 
 **Or import a file:** Settings → **Import**. JSON, `.xlsx` and `.csv` are accepted. Templates:
 [`examples/`](examples), or download the Excel template from Settings.
@@ -46,7 +56,8 @@ couldn't match.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | A | 1 | Push A | 1 | Barbell Bench Press | 3 | 6-8 | 2 | 5 | 135 | 1 | chest, triceps | |
 
-Optional sheets: `Settings` with `Build` (0 = no blocks), `Deload` and `Runs` (on/off), and
+Optional sheets: `Settings` with `Build` (0 = no blocks), `Deload` (weeks), `DeloadSets`,
+`DeloadWeight` and `DeloadRun` (percent), `DeloadRIR` (extra reps in reserve) and `Runs` (on/off), and
 `Runs` with one row per weekly run: `Name`, `Km` (optional), `Notes`. A file without run info
 keeps your current run plan. Older files with `RunEasyMiles`-style columns still import (converted
 to km). Set `Increment`

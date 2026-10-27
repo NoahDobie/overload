@@ -131,3 +131,58 @@ describe('convertUnits', () => {
     expect(useStore.getState().program.days[0].exercises[0].increment).toBe(5)
   })
 })
+
+describe('changing a workout in progress', () => {
+  const bench = { id: 'bench', name: 'Bench', sets: 2, repMin: 5, repMax: 8, rir: 2, increment: 5, startWeight: 100, muscles: ['chest'] }
+  const row = { id: 'row', name: 'Row', sets: 3, repMin: 8, repMax: 10, rir: 1, increment: 5, startWeight: 80, muscles: ['lats'] }
+  const program = { name: 'P', days: [
+    { id: 'A1', week: 'A', name: 'Push', exercises: [bench] },
+    { id: 'A2', week: 'A', name: 'Pull', exercises: [row] }
+  ] }
+  beforeEach(() => { useStore.getState().resetAll(); useStore.getState().setProgram(program); useStore.getState().startWorkout('A1') })
+
+  it('adds an exercise from elsewhere in the program with its own prescription', () => {
+    useStore.getState().addEntry({ name: 'row', muscles: [] })
+    const e = useStore.getState().active.entries[1]
+    expect(e).toMatchObject({ name: 'Row', muscles: ['lats'], adhoc: { sets: 3, repMin: 8 } })
+    expect(e.sets).toEqual([{ w: 80, r: 8, done: false }, { w: 80, r: 8, done: false }, { w: 80, r: 8, done: false }])
+  })
+
+  it('adds a new exercise for today only, following its logged history', () => {
+    useStore.setState({ sessions: [{ id: 's0', dayId: 'A1', date: '2026-10-20', updatedAt: 1, entries: [{ exId: 'x-1', name: 'Dips', sets: [{ w: 20, r: 9, done: true }] }] }] })
+    useStore.getState().addEntry({ name: 'Dips', muscles: ['chest', 'triceps'], equipment: 'weighted' })
+    useStore.getState().updateSet(1, 0, { done: true })
+    useStore.getState().finishWorkout()
+    const S = useStore.getState()
+    expect(S.program.days[0].exercises).toHaveLength(1)
+    const dips = S.sessions[1].entries.find(e => e.name === 'Dips')
+    expect(dips).toMatchObject({ muscles: ['chest', 'triceps'], sets: [{ w: 20, r: 10, done: true }, { w: 20, r: 8, done: false }, { w: 20, r: 8, done: false }] })
+  })
+
+  it('leaves skipped and removed exercises out of the saved session', () => {
+    useStore.getState().addEntry({ name: 'Fly', muscles: [] })
+    useStore.getState().removeEntry(1)
+    useStore.getState().addEntry({ name: 'Curl', muscles: [] })
+    useStore.getState().updateSet(1, 0, { done: true })
+    useStore.getState().skipEntry(0)
+    useStore.getState().finishWorkout()
+    expect(useStore.getState().sessions[0].entries.map(e => e.name)).toEqual(['Curl'])
+  })
+
+  it('re-prescribes an added exercise for a deload session', () => {
+    useStore.getState().addEntry({ name: 'Row', muscles: [] })
+    useStore.getState().setActiveDeload(true)
+    expect(useStore.getState().active.entries[1].sets).toHaveLength(2)
+  })
+})
+
+describe('setRuns', () => {
+  it('switches runs on with one easy run when none are planned', () => {
+    useStore.getState().resetAll()
+    useStore.getState().setProgram({ name: 'P', runs: { enabled: false, plan: [] }, days: [] })
+    useStore.getState().setRuns({ enabled: true })
+    expect(useStore.getState().program.runs).toMatchObject({ enabled: true, plan: [{ name: 'Easy' }] })
+    useStore.getState().setRuns({ enabled: false })
+    expect(useStore.getState().program.runs).toMatchObject({ enabled: false, plan: [{ name: 'Easy' }] })
+  })
+})

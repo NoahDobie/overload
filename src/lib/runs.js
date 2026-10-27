@@ -66,6 +66,30 @@ export const runPlanId = r => r.planId ?? r.type
 export const runName = (r, plan = []) =>
   r.name || plan.find(p => p.id === runPlanId(r))?.name || LEGACY.find(t => t.id === r.type)?.name || 'Run'
 
+// Distances are stored in km; runUnit ('km' or 'mi', a setting) only changes how they are shown
+// and typed.
+const round = (n, d) => Math.round(n * 10 ** d) / 10 ** d
+
+/** km → the run unit, one decimal. */
+export const toDist = (km, unit = 'km') => (km == null ? null : unit === 'mi' ? round(km / KM_PER_MILE, 1) : round(km, 1))
+
+/** A typed distance in the run unit → km (null when blank or not a number). */
+export function fromDist(v, unit = 'km') {
+  const n = numOrNull(typeof v === 'string' ? v.replace(',', '.') : v)
+  return n == null ? null : unit === 'mi' ? round(n * KM_PER_MILE, 3) : n
+}
+
+const trim = n => String(round(n, 1))
+
+/** "6.4 km" / "4 mi" */
+export const fmtDist = (km, unit = 'km') => (km == null ? '' : `${trim(toDist(km, unit))} ${unit}`)
+
+/** Short form for the run chips: "5k", "3.1mi". */
+export const shortDist = (km, unit = 'km') => (km == null ? '' : `${trim(toDist(km, unit))}${unit === 'mi' ? 'mi' : 'k'}`)
+
+/** Short duration for the run chips: "30m", "1.5h". */
+export const shortTime = min => (min == null ? '' : Math.round(min) < 60 ? `${Math.round(min)}m` : `${trim(min / 60)}h`)
+
 /** Monday of the week containing iso. */
 export function weekStart(iso) {
   const d = dateOf(iso)

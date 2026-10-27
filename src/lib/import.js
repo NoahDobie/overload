@@ -8,7 +8,7 @@ import { normalizeRuns, programRuns, MAX_RUNS } from './runs.js'
 import { historyFor, exKey } from './progression.js'
 
 export const SHEET_COLUMNS = ['Week', 'Day', 'DayName', 'Order', 'Exercise', 'Sets', 'Reps', 'RIR', 'Increment', 'StartWeight', 'HitsToProgress', 'Muscles', 'Notes']
-export const SETTINGS_COLUMNS = ['Build', 'Deload', 'Runs']
+export const SETTINGS_COLUMNS = ['Build', 'Deload', 'DeloadSets', 'DeloadWeight', 'DeloadRIR', 'DeloadRun', 'Runs']
 export const RUN_COLUMNS = ['Name', 'Km', 'Notes']
 
 const DEFAULTS = { sets: 3, rir: 2, increment: 5, startWeight: 0, hitsToProgress: 1 }
@@ -149,6 +149,12 @@ export const withoutRenames = program => ({
 
 const lc = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [String(k).trim().toLowerCase().replace(/[\s_]/g, ''), typeof v === 'string' ? v.trim() : v]))
 
+// "50", "50%" or 0.5 → 0.5 (spreadsheet deload columns are percentages)
+const pct = v => {
+  const n = num(String(v ?? '').replace('%', '').trim())
+  return n == null || !Number.isFinite(n) ? undefined : n > 1 ? n / 100 : n
+}
+
 const ON = v => !/^(off|no|n|false|0)$/i.test(String(v ?? '').trim())
 
 /**
@@ -198,6 +204,12 @@ export function programFromRows(rows, settingsRow, name = 'Imported program', ru
     if (s.build != null && s.build !== '') {
       program.block = Number(s.build) === 0 ? null : { build: Number(s.build), deload: num(s.deload) ?? 1 }
     }
+    if (program.block) {
+      const ld = { setsFactor: pct(s.deloadsets), weightFactor: pct(s.deloadweight), rirAdd: num(s.deloadrir) }
+      program.block.liftDeload = Object.fromEntries(Object.entries(ld).filter(([, v]) => v != null))
+      const run = pct(s.deloadrun)
+      if (run != null) program.block.runDeloadFactor = run
+    }
     // Older templates: RunEasyMiles, RunQualityNotes, ...
     const rt = {}
     for (const t of ['easy', 'quality', 'long']) {
@@ -234,14 +246,23 @@ export async function withMuscles(res) {
   return { ...res, info, warnings }
 }
 
+/**
+ * Program JSON as text into { program, errors, warnings, info }. Also takes a pasted AI reply:
+ * the JSON is pulled out of a ```json code block, or from the first { to the last }.
+ */
+export async function importJsonText(text, name = 'Imported program') {
+  const src = String(text || '')
+  const fenced = src.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const body = fenced ? fenced[1] : src.slice(src.indexOf('{'), src.lastIndexOf('}') + 1)
+  let obj
+  try { obj = JSON.parse(body) } catch (e) { return { program: null, errors: ['Not valid JSON: ' + e.message], warnings: [] } }
+  return withMuscles(normalizeProgram({ name, ...obj }))
+}
+
 /** Read a File (json/xlsx/xls/csv) into { program, errors, warnings, info }. */
 export async function importFile(file) {
   const name = file.name.replace(/\.[^.]+$/, '')
-  if (/\.json$/i.test(file.name)) {
-    let obj
-    try { obj = JSON.parse(await file.text()) } catch (e) { return { program: null, errors: ['Not valid JSON: ' + e.message], warnings: [] } }
-    return withMuscles(normalizeProgram({ name, ...obj }))
-  }
+  if (/\.json$/i.test(file.name)) return importJsonText(await file.text(), name)
   const XLSX = await import('xlsx')
   // raw: keep CSV cells as text, otherwise SheetJS reads "3-5" as a date
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: /\.csv$/i.test(file.name) })
@@ -266,7 +287,12 @@ export function programToRows(program) {
 
 export function settingsToRow(program) {
   const b = program.block || {}
-  return { Build: b.enabled === false ? 0 : b.build ?? 3, Deload: b.deload ?? 1, Runs: programRuns(program).enabled ? 'on' : 'off' }
+  const n = normalizeBlock(b), p = f => Math.round(f * 100)
+  return {
+    Build: b.enabled === false ? 0 : b.build ?? 3, Deload: b.deload ?? 1,
+    DeloadSets: p(n.liftDeload.setsFactor), DeloadWeight: p(n.liftDeload.weightFactor), DeloadRIR: n.liftDeload.rirAdd, DeloadRun: p(n.runDeloadFactor),
+    Runs: programRuns(program).enabled ? 'on' : 'off'
+  }
 }
 
 export const runsToRows = program => programRuns(program).plan.map(p => ({ Name: p.name, Km: p.km ?? '', Notes: p.notes }))

@@ -87,3 +87,28 @@ test('an untouched workout asks to save or discard', async ({ page }) => {
   await prompt.getByRole('button', { name: 'Discard workout' }).click()
   expect((await state(page)).sessions).toHaveLength(1)
 })
+
+test('add an exercise for today, skip another, finish without the unchecked warning', async ({ page }) => {
+  await startWorkout(page, 'Full body')
+  const before = (await state(page)).active.entries.length
+  await page.getByRole('button', { name: 'Add exercise' }).click()
+  await page.getByPlaceholder(/Search/).fill('Hammer Curl')
+  await page.getByRole('button', { name: /^Dumbbell Hammer Curl Biceps/ }).click()
+  const card = page.locator('.card.ex').last()
+  await expect(card).toContainText('Dumbbell Hammer Curl')
+  await card.getByRole('button', { name: 'Done set 1' }).click()
+  // Skip every program exercise except the first, tick one set of it, then finish
+  for (let i = before - 1; i >= 1; i--) await page.locator('.card.ex').nth(i).getByRole('button', { name: 'Skip today' }).click()
+  await expect(page.locator('.card.ex.skipped')).toHaveCount(before - 1)
+  const first = page.locator('.card.ex').first()
+  const sets = await first.locator('.set').count()
+  for (let i = 1; i <= sets; i++) await first.getByRole('button', { name: `Done set ${i}` }).click()
+  // Two of the curl's three sets are unticked: only those are warned about
+  page.once('dialog', d => { expect(d.message()).toMatch(/^2 sets not checked off/); d.accept() })
+  await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await page.waitForURL(/\/$/)
+  const S = await state(page)
+  expect(S.sessions[0].entries).toHaveLength(2)
+  expect(S.sessions[0].entries[1]).toMatchObject({ name: 'Dumbbell Hammer Curl', muscles: ['biceps', 'forearm'] })
+  expect(S.program.days.flatMap(d => d.exercises).some(e => e.name === 'Dumbbell Hammer Curl' && e.id === S.sessions[0].entries[1].exId)).toBe(false)
+})

@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useStore } from '../store.js'
+import { useStore, runUnitOf } from '../store.js'
 import { normalizeProgram } from '../lib/import.js'
-import { loadLibrary, search, guessMuscles, MAX_GUESSED_MUSCLES } from '../lib/exercises.js'
-import { MUSCLES, MUSCLE_NAME } from '../lib/muscles.js'
+import { loadLibrary, guessMuscles, MAX_GUESSED_MUSCLES, BODYWEIGHT_EQUIPMENT } from '../lib/exercises.js'
+import { MUSCLE_NAME } from '../lib/muscles.js'
 import { historyFor, exKey } from '../lib/progression.js'
 import { uid } from '../lib/util.js'
-import { programRuns, MAX_RUNS } from '../lib/runs.js'
+import { programRuns, MAX_RUNS, toDist, fromDist, fmtDist } from '../lib/runs.js'
 import { Icon, Sheet, Stepper } from '../components/ui.jsx'
 import { SortableList, DragHandle, moveItem } from '../components/Sortable.jsx'
+import AddExerciseSheet from '../components/AddExerciseSheet.jsx'
 import pplul from '../../examples/program.json'
 import upperLower from '../../examples/upper-lower.json'
 import fullBody from '../../examples/full-body.json'
@@ -21,7 +22,6 @@ export const TEMPLATES = [
 ]
 
 const DEFAULTS = { sets: 3, repMin: 8, repMax: 12, rir: 2, increment: 5, startWeight: 0, hitsToProgress: 1, notes: '' }
-const BODYWEIGHT = new Set(['body weight', 'assisted', 'suspension trainer'])
 
 // Editor copy of a program: every exercise gets a React key and remembers the name it had
 // when the editor opened, so renames can carry their history along.
@@ -122,7 +122,7 @@ export default function ProgramEditor() {
     updateDay(dayKey, day => {
       day.exercises.push({
         ...DEFAULTS, key, name: pick.name, mName: pick.name, muscles: [...pick.muscles].slice(0, MAX_GUESSED_MUSCLES),
-        increment: pick.equipment && BODYWEIGHT.has(pick.equipment) ? 0 : DEFAULTS.increment
+        increment: pick.equipment && BODYWEIGHT_EQUIPMENT.has(pick.equipment) ? 0 : DEFAULTS.increment
       })
     })
     setAdding(null)
@@ -219,7 +219,7 @@ export default function ProgramEditor() {
 
       <button className="btn ghost" onClick={addDay}><Icon name="plus" size={16} /> Add day</button>
 
-      <RunsEditor runs={draft.runs} onChange={fn => update(d => { fn(d.runs); return d })} />
+      <RunsEditor runs={draft.runs} unit={runUnitOf(S)} onChange={fn => update(d => { fn(d.runs); return d })} />
       <button className="btn primary big" onClick={save}>Save program</button>
 
       <AddExerciseSheet open={!!adding} lib={lib} onClose={() => setAdding(null)} onPick={pick => addExercise(adding, pick)} />
@@ -233,7 +233,16 @@ export default function ProgramEditor() {
   )
 }
 
-function RunsEditor({ runs, onChange }) {
+/** Distance typed in the run unit, kept in km. Holds the text while typing ("3." stays "3."). */
+function DistInput({ km, unit, onChange }) {
+  const [text, setText] = useState(km == null || km === '' ? '' : String(toDist(Number(km), unit)))
+  return (
+    <input inputMode="decimal" value={text} placeholder="Leave blank for no plan"
+      onChange={e => { const t = e.target.value.replace(',', '.').replace(/[^0-9.]/g, ''); setText(t); onChange(fromDist(t, unit)) }} />
+  )
+}
+
+function RunsEditor({ runs, unit, onChange }) {
   const [editing, setEditing] = useState(null)   // run id
   const toggle = on => onChange(r => {
     r.enabled = on
@@ -261,7 +270,7 @@ function RunsEditor({ runs, onChange }) {
                 <DragHandle {...handle(r.id, r.name || `run ${i + 1}`)} />
                 <button className="ed-ex" onClick={() => setEditing(r.id)}>
                   <span className="ed-name">{r.name}</span>
-                  <span className="ed-sum">{[r.km !== '' && r.km != null ? `${r.km} km planned` : 'No planned distance', r.notes].filter(Boolean).join(' · ')}</span>
+                  <span className="ed-sum">{[r.km !== '' && r.km != null ? `${fmtDist(Number(r.km), unit)} planned` : 'No planned distance', r.notes].filter(Boolean).join(' · ')}</span>
                 </button>
               </div>
             )}
@@ -270,7 +279,7 @@ function RunsEditor({ runs, onChange }) {
         <div className="row gap">
           <button className="btn primary small grow" disabled={full} onClick={add}><Icon name="plus" size={16} /> {full ? `${MAX_RUNS} runs max` : 'Run'}</button>
         </div>
-        <p className="small muted">Planned km is optional. When you mark a run done, you enter what you actually ran.</p>
+        <p className="small muted">Planned distance is optional. When you mark a run done, you enter what you actually ran.</p>
       </>}
       {run && (
         <Sheet open onClose={() => setEditing(null)} title="Run">
@@ -279,9 +288,8 @@ function RunsEditor({ runs, onChange }) {
             <input value={run.name} placeholder="e.g. Easy, Tempo, Long" onChange={e => onChange(x => { x.plan.find(r => r.id === run.id).name = e.target.value })} />
           </label>
           <label className="field">
-            <span>Planned distance (km, optional)</span>
-            <input inputMode="decimal" value={run.km ?? ''} placeholder="Leave blank for no plan"
-              onChange={e => onChange(x => { x.plan.find(r => r.id === run.id).km = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '') })} />
+            <span>Planned distance ({unit}, optional)</span>
+            <DistInput key={run.id} km={run.km} unit={unit} onChange={km => onChange(x => { x.plan.find(r => r.id === run.id).km = km })} />
           </label>
           <label className="field">
             <span>Notes</span>
@@ -308,53 +316,6 @@ function TemplateList({ onPick, compact }) {
         </button>
       ))}
     </div>
-  )
-}
-
-function AddExerciseSheet({ open, lib, onClose, onPick }) {
-  const [q, setQ] = useState('')
-  const [muscle, setMuscle] = useState('')
-  const [equipment, setEquipment] = useState('')
-  useEffect(() => { if (open) { setQ(''); setMuscle(''); setEquipment('') } }, [open])
-  const equipmentList = useMemo(() => (lib ? [...new Set(lib.map(e => e.equipment))].sort() : []), [lib])
-  const results = useMemo(() => (lib ? search(lib, q, { muscle, equipment, limit: 50 }) : []), [lib, q, muscle, equipment])
-  const custom = () => {
-    const g = lib ? guessMuscles(lib, q) : null
-    onPick({ name: q.trim(), muscles: g?.muscles || [], equipment: '' })
-  }
-  return (
-    <Sheet open={open} onClose={onClose} title="Add exercise">
-      <input autoFocus type="search" placeholder="Search, e.g. incline db press" value={q} onChange={e => setQ(e.target.value)} />
-      <div className="row gap">
-        <select className="grow" aria-label="Muscle" value={muscle} onChange={e => setMuscle(e.target.value)}>
-          <option value="">Any muscle</option>
-          {MUSCLES.map(m => <option key={m} value={m}>{MUSCLE_NAME[m]}</option>)}
-        </select>
-        <select className="grow" aria-label="Equipment" value={equipment} onChange={e => setEquipment(e.target.value)}>
-          <option value="">Any equipment</option>
-          {equipmentList.map(x => <option key={x} value={x}>{x[0].toUpperCase() + x.slice(1)}</option>)}
-        </select>
-      </div>
-      {q.trim() && (
-        <button className="pick custom" onClick={custom}>
-          <span className="pick-name"><Icon name="plus" size={16} /> Add “{q.trim()}”</span>
-          <span className="pick-sub">As your own exercise. Its muscles are matched from the name.</span>
-        </button>
-      )}
-      {!lib ? <p className="empty small">Loading exercises…</p> : (
-        <ul className="picks">
-          {results.map(e => (
-            <li key={e.name}>
-              <button className="pick" onClick={() => onPick(e)}>
-                <span className="pick-name">{e.name}</span>
-                <span className="pick-sub">{e.muscles.slice(0, MAX_GUESSED_MUSCLES).map(m => MUSCLE_NAME[m]).join(', ')} · {e.equipment}</span>
-              </button>
-            </li>
-          ))}
-          {!results.length && <li className="empty small">Nothing found. Add it as your own exercise above.</li>}
-        </ul>
-      )}
-    </Sheet>
   )
 }
 

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore, unitOf, blockOf } from '../store.js'
 import { fmtNum } from '../lib/util.js'
+import { loadLibrary } from '../lib/exercises.js'
 import { Icon } from '../components/ui.jsx'
 import SetTable from '../components/SetTable.jsx'
+import AddExerciseSheet from '../components/AddExerciseSheet.jsx'
 
 function Elapsed({ since }) {
   const [, tick] = useState(0)
@@ -16,6 +18,16 @@ function ExerciseCard({ entry, ei, ex, unit }) {
   const updateSet = useStore(s => s.updateSet)
   const addSet = useStore(s => s.addSet)
   const removeSet = useStore(s => s.removeSet)
+  const skipEntry = useStore(s => s.skipEntry)
+  const removeEntry = useStore(s => s.removeEntry)
+  if (entry.skipped) {
+    return (
+      <section className="card ex skipped">
+        <div className="ex-h"><h2>{entry.name}</h2><span className="muted small">Skipped</span></div>
+        <button className="link" onClick={() => skipEntry(ei, false)}>Undo</button>
+      </section>
+    )
+  }
   const t = entry.target
   const allDone = entry.sets.every(s => s.done)
   const range = ex ? (ex.repMin === ex.repMax ? `${ex.repMin}` : `${ex.repMin}–${ex.repMax}`) : ''
@@ -33,6 +45,9 @@ function ExerciseCard({ entry, ei, ex, unit }) {
       {ex?.notes && <p className="muted small">{ex.notes}</p>}
       <SetTable sets={entry.sets} unit={unit} step={ex?.increment || 5}
         onSet={(si, patch) => updateSet(ei, si, patch)} onAdd={() => addSet(ei)} onRemove={() => removeSet(ei)} />
+      {entry.adhoc
+        ? <button className="link small" onClick={() => removeEntry(ei)}>Remove from today</button>
+        : !entry.sets.some(s => s.done) && <button className="link small" onClick={() => skipEntry(ei)}>Skip today</button>}
     </section>
   )
 }
@@ -40,14 +55,18 @@ function ExerciseCard({ entry, ei, ex, unit }) {
 export default function Workout() {
   const S = useStore()
   const nav = useNavigate()
-  const { finishWorkout, discardWorkout, setActiveDeload } = S
+  const { finishWorkout, discardWorkout, setActiveDeload, addEntry } = S
   const a = S.active
+  const [adding, setAdding] = useState(false)
+  const [lib, setLib] = useState(null)
+  useEffect(() => { if (adding && !lib) loadLibrary().then(setLib) }, [adding, lib])
   useEffect(() => { if (!a) nav('/', { replace: true }) }, [a, nav])
   if (!a) return null
   const day = S.program?.days.find(d => d.id === a.dayId)
   const unit = unitOf(S)
-  const done = a.entries.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0)
-  const total = a.entries.reduce((n, e) => n + e.sets.length, 0)
+  const live = a.entries.filter(e => !e.skipped)
+  const done = live.reduce((n, e) => n + e.sets.filter(s => s.done).length, 0)
+  const total = live.reduce((n, e) => n + e.sets.length, 0)
   const pos = blockOf(S)
 
   const finish = () => {
@@ -78,8 +97,11 @@ export default function Workout() {
       )}
 
       {a.entries.map((e, ei) => (
-        <ExerciseCard key={e.exId + ei} entry={e} ei={ei} ex={day?.exercises.find(x => x.id === e.exId)} unit={unit} />
+        <ExerciseCard key={e.exId + ei} entry={e} ei={ei} ex={day?.exercises.find(x => x.id === e.exId) || e.adhoc} unit={unit} />
       ))}
+
+      <button className="btn ghost" onClick={() => setAdding(true)}><Icon name="plus" size={16} /> Add exercise</button>
+      <AddExerciseSheet open={adding} lib={lib} onClose={() => setAdding(false)} onPick={pick => { addEntry(pick); setAdding(false) }} />
 
       <div className="row gap">
         <button className="btn ghost danger" onClick={discard}>Discard</button>

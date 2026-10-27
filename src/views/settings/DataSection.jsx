@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { useStore, unitOf, hasWeights } from '../../store.js'
+import { useStore, unitOf, runUnitOf, hasWeights } from '../../store.js'
 import { syncedPart, mergeDocs } from '../../lib/merge.js'
 import { useSync } from '../../syncStatus.js'
 import { todayISO, download } from '../../lib/util.js'
@@ -30,8 +30,10 @@ export default function DataSection() {
   return (
     <section className="card">
       <div className="card-h"><h2>Data</h2></div>
-      <p className="small muted">Units</p>
+      <p className="small muted">Weight units</p>
       <Segmented value={unitOf(S)} onChange={changeUnit} options={[{ value: 'lb', label: 'lb' }, { value: 'kg', label: 'kg' }]} />
+      <p className="small muted">Run units</p>
+      <Segmented value={runUnitOf(S)} onChange={u => setSettings({ runUnit: u })} options={[{ value: 'km', label: 'km' }, { value: 'mi', label: 'miles' }]} />
       <div className="btn-col">
         <div className="row gap">
           <button className="btn grow small nowrap" onClick={backup}>Export backup</button>

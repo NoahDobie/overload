@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { useStore, unitOf, blockOf, targetFor } from '../store.js'
+import { useStore, unitOf, runUnitOf, blockOf, targetFor } from '../store.js'
 import { nextDayIndex, dayNumber } from '../lib/rotation.js'
-import { runsForWeek, programRuns, runTarget, runKm } from '../lib/runs.js'
+import { runsForWeek, programRuns, runTarget, runKm, toDist, fromDist, fmtDist, shortDist, shortTime } from '../lib/runs.js'
 import { normalizeBlock } from '../lib/block.js'
 import { avg7, weeklyChange, sortedWeights } from '../lib/bodyweight.js'
 import { todayISO, fmtDate, fmtNum } from '../lib/util.js'
@@ -19,27 +19,35 @@ function BlockBadge({ pos }) {
   )
 }
 
-function RunSheet({ item, target, existing, onClose }) {
+function RunSheet({ item, target, existing, unit, onClose }) {
   const logRun = useStore(s => s.logRun)
   const deleteRun = useStore(s => s.deleteRun)
-  const [km, setKm] = useState(existing ? String(runKm(existing) ?? '') : '')
-  const [minutes, setMinutes] = useState(existing?.minutes ?? '')
+  const [dist, setDist] = useState(existing ? String(toDist(runKm(existing), unit) ?? '') : '')
+  // Time as hours + minutes; stored as total minutes.
+  const [hrs, setHrs] = useState(existing?.minutes >= 60 ? String(Math.floor(existing.minutes / 60)) : '')
+  const [mins, setMins] = useState(existing?.minutes != null ? String(Math.round(existing.minutes % 60)) : '')
+  const digits = v => v.replace(/[^0-9]/g, '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [date, setDate] = useState(existing?.date ?? todayISO())
-  const ok = Number(km) > 0
+  const ok = Number(dist) > 0
   const save = e => {
     e.preventDefault()
     if (!ok) return
-    logRun({ id: existing?.id, planId: item.id, name: item.name, date, km: Number(km), minutes: minutes === '' ? null : Number(minutes), notes })
+    logRun({ id: existing?.id, planId: item.id, name: item.name, date, km: fromDist(dist, unit), minutes: hrs === '' && mins === '' ? null : Number(hrs || 0) * 60 + Number(mins || 0), notes })
     onClose()
   }
-  const plan = [target.km != null && `${fmtNum(target.km)} km`, target.notes].filter(Boolean).join(' · ')
+  const plan = [target.km != null && fmtDist(target.km, unit), target.notes].filter(Boolean).join(' · ')
   return (
     <Sheet open onClose={onClose} title={item.name}>
       {plan && <p className="muted small">Plan: {plan}</p>}
       <form className="form-grid" onSubmit={save}>
-        <label>Distance (km)<input autoFocus inputMode="decimal" required value={km} onChange={e => setKm(e.target.value.replace(',', '.'))} placeholder={target.km != null ? `plan ${fmtNum(target.km)}` : 'km'} /></label>
-        <label>Minutes<input inputMode="decimal" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="optional" /></label>
+        <label>Distance ({unit})<input autoFocus inputMode="decimal" required value={dist} onChange={e => setDist(e.target.value.replace(',', '.'))} placeholder={target.km != null ? `plan ${fmtNum(toDist(target.km, unit))}` : unit} /></label>
+        <div className="fld">Time (optional)
+          <div className="row time-in">
+            <input inputMode="numeric" aria-label="Hours" value={hrs} onChange={e => setHrs(digits(e.target.value))} placeholder="0" /><span>h</span>
+            <input inputMode="numeric" aria-label="Minutes" value={mins} onChange={e => setMins(digits(e.target.value))} placeholder="00" /><span>m</span>
+          </div>
+        </div>
         <label className="span2">Date<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
         <label className="span2">Notes<input value={notes} onChange={e => setNotes(e.target.value)} placeholder="optional, e.g. felt easy, hilly" /></label>
         <div className="row gap span2">
@@ -57,12 +65,13 @@ function RunsCard({ S, pos }) {
   if (!S.program || !enabled || !plan.length) return null
   const factor = normalizeBlock(S.program.block).runDeloadFactor
   const week = runsForWeek(S.runs, todayISO(), plan)
+  const unit = runUnitOf(S)
   const item = plan.find(p => p.id === open)
   return (
     <section className="card">
       <div className="card-h">
         <h2><Icon name="run" size={18} /> Runs this week</h2>
-        <span className={'count' + (week.count === plan.length ? ' full' : '')}>{week.count}/{plan.length}{week.km ? ` · ${fmtNum(week.km)} km` : ''}</span>
+        <span className={'count' + (week.count === plan.length ? ' full' : '')}>{week.count}/{plan.length}{week.km ? ` · ${fmtDist(week.km, unit)}` : ''}</span>
       </div>
       <div className="runs">
         {plan.map(p => {
@@ -72,16 +81,13 @@ function RunsCard({ S, pos }) {
             <button key={p.id} className={'run-pill' + (r ? ' done' : '')} onClick={() => setOpen(p.id)}>
               <span className="run-check">{r ? <Icon name="check" size={16} stroke={3} /> : null}</span>
               <span className="run-l">{p.name}</span>
-              <span className="run-s">
-                {r ? [runKm(r) != null && `${fmtNum(runKm(r))} km`, r.minutes != null && `${fmtNum(r.minutes)} min`].filter(Boolean).join(' · ') || 'Done'
-                  : t.km != null ? `${fmtNum(t.km)} km` : ' '}
-              </span>
+              <span className="run-s">{r ? [shortDist(runKm(r), unit), shortTime(r.minutes)].filter(Boolean).join(' · ') || 'Done' : shortDist(t.km, unit)}</span>
             </button>
           )
         })}
       </div>
       {pos.isDeload && <p className="muted small">Deload week: planned distances at {Math.round(factor * 100)}%, keep every run easy.</p>}
-      {item && <RunSheet item={item} target={runTarget(item, pos.isDeload, factor)} existing={week.done[item.id]} onClose={() => setOpen(null)} />}
+      {item && <RunSheet item={item} target={runTarget(item, pos.isDeload, factor)} existing={week.done[item.id]} unit={unit} onClose={() => setOpen(null)} />}
     </section>
   )
 }

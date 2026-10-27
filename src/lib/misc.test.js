@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nextDayIndex, dayNumber } from './rotation.js'
-import { runsForWeek, weekStart, normalizeRuns, programRuns, runKm, runName, runTarget, keepRunIds, MAX_RUNS } from './runs.js'
+import { runsForWeek, weekStart, normalizeRuns, programRuns, runKm, runName, runTarget, keepRunIds, MAX_RUNS, toDist, fromDist, fmtDist, shortDist, shortTime } from './runs.js'
 import { avg7, weeklyChange } from './bodyweight.js'
 import { mergeDocs, syncedPart, applyReset } from './merge.js'
 import { muscleLoad, levelsOf, normalizeMuscle } from './muscles.js'
@@ -71,6 +71,19 @@ describe('runs', () => {
     expect(runName({ planId: 'x', name: 'Hill reps' })).toBe('Hill reps')
     expect(runTarget({ km: 10, notes: 'z2' }, true)).toEqual({ km: 7, notes: 'z2' })
     expect(runTarget({ km: null, notes: '' }, false)).toEqual({ km: null, notes: '' })
+  })
+})
+
+describe('run units', () => {
+  it('shows and reads distances in km or miles, storing km', () => {
+    expect([shortDist(5, 'km'), shortDist(13.25, 'km'), shortDist(8.047, 'mi'), shortDist(null)]).toEqual(['5k', '13.3k', '5mi', ''])
+    expect([fmtDist(6.4), fmtDist(10, 'mi')]).toEqual(['6.4 km', '6.2 mi'])
+    expect(fromDist('3', 'mi')).toBe(4.828)
+    expect(toDist(fromDist('3', 'mi'), 'mi')).toBe(3)
+    expect([fromDist('6,5'), fromDist(''), fromDist('x')]).toEqual([6.5, null, null])
+  })
+  it('shortens times: minutes under an hour, then hours', () => {
+    expect([shortTime(30), shortTime(59.6), shortTime(60), shortTime(90), shortTime(null)]).toEqual(['30m', '1h', '1h', '1.5h', ''])
   })
 })
 

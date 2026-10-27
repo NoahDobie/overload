@@ -6,23 +6,31 @@
 
 import { dateOf, addDays } from './util.js'
 import { weekStart } from './runs.js'
-import { topWeight } from './progression.js'
+import { topWeight, roundTo } from './progression.js'
 
 export const DEFAULT_BLOCK = {
   build: 3,
   deload: 1,
-  liftDeload: { setsFactor: 0.5, rirAdd: 2 },
+  liftDeload: { setsFactor: 0.5, rirAdd: 2, weightFactor: 1 },
   runDeloadFactor: 0.7
 }
 
+// Each deload knob kept within a sensible range; anything unreadable falls back to the default.
+const clamp = (v, lo, hi, dflt) => (v == null || v === '' || !Number.isFinite(Number(v)) ? dflt : Math.min(hi, Math.max(lo, Number(v))))
+
 export const normalizeBlock = b => {
-  if (b === null || b?.enabled === false) return { ...DEFAULT_BLOCK, enabled: false }
-  return {
-    ...DEFAULT_BLOCK,
-    ...(b || {}),
-    liftDeload: { ...DEFAULT_BLOCK.liftDeload, ...(b?.liftDeload || {}) },
-    enabled: true
+  const ld = { ...DEFAULT_BLOCK.liftDeload, ...(b?.liftDeload || {}) }
+  const d = DEFAULT_BLOCK.liftDeload
+  const knobs = {
+    liftDeload: {
+      setsFactor: clamp(ld.setsFactor, 0.25, 1, d.setsFactor),
+      rirAdd: clamp(ld.rirAdd, 0, 4, d.rirAdd),
+      weightFactor: clamp(ld.weightFactor, 0.6, 1, d.weightFactor)
+    },
+    runDeloadFactor: clamp(b?.runDeloadFactor, 0.4, 1, DEFAULT_BLOCK.runDeloadFactor)
   }
+  if (b === null || b?.enabled === false) return { ...DEFAULT_BLOCK, ...(b || {}), ...knobs, enabled: false }
+  return { ...DEFAULT_BLOCK, ...(b || {}), ...knobs, enabled: true }
 }
 
 const weeksBetween = (fromMonday, toMonday) => Math.round((dateOf(toMonday) - dateOf(fromMonday)) / (7 * 864e5))
@@ -50,19 +58,22 @@ export const restartNextMonday = iso => addDays(weekStart(iso), 7)
 /** blockStart that makes the week of iso build week 1 (skips a deload in progress). */
 export const restartThisWeek = iso => weekStart(iso)
 
-/** Deload-week prescription: same weight, fewer sets, more reps in reserve, no progression. */
+/** Deload-week prescription: fewer sets, same (or cut) weight, more reps in reserve, no progression. */
 export function deloadTarget(ex, target, blockCfg) {
-  const { setsFactor, rirAdd } = normalizeBlock(blockCfg).liftDeload
+  const { setsFactor, rirAdd, weightFactor } = normalizeBlock(blockCfg).liftDeload
   const sets = Math.max(1, Math.ceil(ex.sets * setsFactor))
   const reps = target.reps.slice(0, sets).map(() => ex.repMin)
+  // Hold the last working weight (no increase mid-deload), less the deload's weight cut if any.
+  const held = target.last ? topWeight(target.last) : target.weight
+  const weight = weightFactor < 1 ? roundTo(held * weightFactor, Number(ex.increment) || 0) : held
+  const load = weightFactor < 1 ? `${Math.round(weightFactor * 100)}% weight` : 'same weight'
   return {
     ...target,
-    // Hold the last working weight: no increase mid-deload, and no extra cut on top of it.
-    weight: target.last ? topWeight(target.last) : target.weight,
+    weight,
     reps,
     rir: (Number(ex.rir) || 0) + rirAdd,
     kind: 'block-deload',
-    reason: `Deload week: ${sets} set${sets > 1 ? 's' : ''}, same weight, leave ${(Number(ex.rir) || 0) + rirAdd} in the tank`
+    reason: `Deload week: ${sets} set${sets > 1 ? 's' : ''}, ${load}, leave ${(Number(ex.rir) || 0) + rirAdd} in the tank`
   }
 }
 
