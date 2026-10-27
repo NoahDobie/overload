@@ -11,16 +11,16 @@ test('switching to kg converts logged and planned weights', async ({ page }) => 
   }`)
   await page.goto('/settings')
   await page.getByRole('radio', { name: 'kg' }).click()
-  expect(dialogs.at(-1)).toContain('225 lb becomes 102.1 kg')
+  expect(dialogs.at(-1)).toContain('225 lb becomes 102 kg')
   const S = await state(page)
   expect(S.settings.unit).toBe('kg')
-  expect(S.sessions[0].entries[0].sets[0].w).toBe(102.1)
+  expect(S.sessions[0].entries[0].sets[0].w).toBe(102)
   expect(S.bodyweight[0].weight).toBe(81.6)
   expect(S.program.days[0].exercises[0].increment).toBe(5)     // 10 lb step → 5 kg
 
   await page.getByRole('link', { name: 'Today' }).click()
   await page.getByRole('button', { name: 'Full Body 1', exact: true }).click()
-  // 102.1 kg × 8 hit the top of 5-8, so +5 kg (the converted 10 lb step)
+  // 102 kg × 8 hit the top of 5-8, so +5 kg (the converted 10 lb step)
   await expect(page.locator('.preview li', { hasText: 'Barbell Squat' })).toContainText('105 kg')
 })
 

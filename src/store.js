@@ -17,6 +17,9 @@ export const unitOf = S => S.settings?.unit || S.program?.unit || 'lb'
 /** Unit runs are shown and typed in ('km' or 'mi'); they are always stored in km. */
 export const runUnitOf = S => (S.settings?.runUnit === 'mi' ? 'mi' : 'km')
 
+/** Name of a logged workout: its day in the program, else the name it was saved with. */
+export const sessionName = (S, s) => S.program?.days.find(d => d.id === s.dayId)?.name || s.dayName || 'Workout'
+
 export const blockOf = (S, iso = todayISO()) => blockPosition(S.program?.block, S.settings?.blockStart, iso)
 
 /** Target for one exercise today, deload-adjusted when the block says so. */
@@ -27,15 +30,23 @@ export function targetFor(S, ex, isDeload) {
 
 const touch = x => ({ ...x, updatedAt: now() })
 
-// lb ↔ kg. Weights keep one decimal; increments map to the matching plate step.
+// lb ↔ kg; increments map to the matching plate step. A converted weight snaps to the nearest
+// 0.25 kg / 0.5 lb when that is close (SNAP_KG, the same distance in both units), else keeps one
+// decimal. Because the tolerance matches both ways, switching there and back lands on the
+// starting weight for anything on that grid (225 lb → 102 kg → 225 lb), so history doesn't drift.
 export const LB_PER_KG = 2.20462262
 const STEP_LB_TO_KG = { 1.25: 0.5, 2.5: 1.25, 5: 2.5, 10: 5, 20: 10 }
 const STEP_KG_TO_LB = { 0.5: 1.25, 1.25: 2.5, 2.5: 5, 5: 10, 10: 20 }
+const GRID = { kg: 0.25, lb: 0.5 }
+const SNAP_KG = 0.07
 const half = n => Math.round(n * 2) / 2
 export function convertWeight(w, to) {
   const n = Number(w)
   if (!n) return w
-  return Math.round((to === 'kg' ? n / LB_PER_KG : n * LB_PER_KG) * 10) / 10
+  const x = to === 'kg' ? n / LB_PER_KG : n * LB_PER_KG
+  const near = Math.round(x / GRID[to]) * GRID[to]
+  const tol = to === 'kg' ? SNAP_KG : SNAP_KG * LB_PER_KG
+  return Math.abs(near - x) <= tol + 1e-9 ? near : Math.round(x * 10) / 10
 }
 export function convertStep(step, to) {
   const n = Number(step) || 0
@@ -194,10 +205,12 @@ export const useStore = create(persist((set, get) => ({
   },
 
   finishWorkout() {
-    const a = get().active
+    const { active: a, program } = get()
     if (!a) return
     const session = {
       id: a.id, dayId: a.dayId, date: a.date, deload: !!a.deload,
+      // Kept so the log still has a name after the day is renamed away or the program cleared.
+      dayName: program?.days.find(d => d.id === a.dayId)?.name || null,
       // Until the last ticked set, so time away from the app after it doesn't count.
       durationMin: Math.round(((a.lastSetAt > a.startedAt ? a.lastSetAt : now()) - a.startedAt) / 60000),
       entries: a.entries.filter(e => !e.skipped && e.sets.length).map(e => ({

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { nextDayIndex, dayNumber } from './rotation.js'
-import { runsForWeek, weekStart, normalizeRuns, programRuns, runKm, runName, runTarget, keepRunIds, MAX_RUNS, toDist, fromDist, fmtDist, shortDist, shortTime } from './runs.js'
+import { runsForWeek, weekStart, normalizeRuns, programRuns, runName, runTarget, keepRunIds, MAX_RUNS, toDist, fromDist, fmtDist, shortDist, shortTime } from './runs.js'
 import { avg7, weeklyChange } from './bodyweight.js'
 import { mergeDocs, syncedPart, applyReset } from './merge.js'
 import { muscleLoad, levelsOf, normalizeMuscle } from './muscles.js'
@@ -29,9 +29,9 @@ describe('rotation', () => {
 describe('runs', () => {
   it('buckets Monday to Sunday', () => {
     expect(weekStart('2026-11-01')).toBe('2026-10-26')   // Sunday → previous Monday
-    const { plan } = programRuns({})
+    const plan = ['easy', 'quality', 'long'].map(id => ({ id }))
     const runs = [
-      { id: 1, date: '2026-10-26', type: 'easy', miles: 4 },                 // old record
+      { id: 1, date: '2026-10-26', planId: 'easy', km: 6.4 },
       { id: 2, date: '2026-11-01', planId: 'long', km: 12 },
       { id: 3, date: '2026-11-02', planId: 'quality', km: 8 },               // next week
       { id: 4, date: '2026-10-28', planId: 'quality', km: 8, deleted: true },
@@ -44,10 +44,9 @@ describe('runs', () => {
     expect(w.km).toBe(21.4)                                                  // 6.4 + 12 + 3
   })
 
-  it('normalizes run plans and converts the old miles targets', () => {
-    expect(programRuns({}).plan.map(p => p.id)).toEqual(['easy', 'quality', 'long'])
-    const old = programRuns({ runTargets: { long: { miles: 8, notes: 'easy pace' } } })
-    expect(old.plan[2]).toEqual({ id: 'long', name: 'Long', km: 12.9, notes: 'easy pace' })
+  it('normalizes run plans', () => {
+    expect(normalizeRuns()).toEqual({ enabled: false, plan: [] })
+    expect(programRuns(null)).toEqual({ enabled: false, plan: [] })
     const r = normalizeRuns({ enabled: false, plan: Array.from({ length: 9 }, (_, i) => ({ name: i ? '' : 'Tempo', km: i === 1 ? '5.5' : '' })) })
     expect(r.enabled).toBe(false)
     expect(r.plan).toHaveLength(MAX_RUNS)
@@ -64,10 +63,8 @@ describe('runs', () => {
   })
 
   it('names, distances and deload targets', () => {
-    expect(runKm({ km: 5 })).toBe(5)
-    expect(runKm({ miles: 5 })).toBe(8)
-    expect(runKm({})).toBeNull()
-    expect(runName({ type: 'long' })).toBe('Long')
+    expect(runName({ planId: 'long' }, [{ id: 'long', name: 'Long' }])).toBe('Long')
+    expect(runName({ planId: 'gone' })).toBe('Run')
     expect(runName({ planId: 'x', name: 'Hill reps' })).toBe('Hill reps')
     expect(runTarget({ km: 10, notes: 'z2' }, true)).toEqual({ km: 7, notes: 'z2' })
     expect(runTarget({ km: null, notes: '' }, false)).toEqual({ km: null, notes: '' })

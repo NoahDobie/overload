@@ -2,43 +2,27 @@ import { live, dateOf, isoOf, addDays, uid } from './util.js'
 
 // Weekly runs: the program's plan is up to MAX_RUNS named runs, each with an optional
 // planned distance (km) and notes. A logged run records which planned run it was (planId)
-// plus what was actually done. Older data used three fixed types (easy/quality/long) in
-// miles; those ids are kept so old logs still line up.
+// plus what was actually done.
 
 export const MAX_RUNS = 7
 export const KM_PER_MILE = 1.609344
-const LEGACY = [{ id: 'easy', name: 'Easy' }, { id: 'quality', name: 'Quality' }, { id: 'long', name: 'Long' }]
 
 const km1 = n => Math.round(n * 10) / 10
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 const numOrNull = v => (v === '' || v == null || !isFinite(Number(v)) || Number(v) < 0 ? null : Number(v))
 
-/**
- * The run plan of a program: { enabled, plan: [{ id, name, km, notes }] }.
- * Accepts the current shape, the old runTargets ({ easy: { miles, notes }, ... }), or nothing
- * (the original three runs, no distances).
- */
-export function normalizeRuns(runs, legacyTargets) {
-  if (runs && typeof runs === 'object' && Array.isArray(runs.plan)) {
-    const ids = new Set()
-    const plan = runs.plan.slice(0, MAX_RUNS).map((r, i) => {
-      const name = String(r.name || '').trim() || `Run ${i + 1}`
-      let id = String(r.id || slug(name) || uid())          // from the name, so "Easy" lines up with old logs
-      while (ids.has(id)) id = uid()
-      ids.add(id)
-      return { id, name, km: numOrNull(r.km), notes: String(r.notes || '') }
-    })
-    return { enabled: runs.enabled !== false, plan }
-  }
-  const t = legacyTargets || {}
-  return {
-    enabled: true,
-    plan: LEGACY.map(({ id, name }) => ({
-      id, name,
-      km: t[id]?.miles != null && t[id].miles !== '' ? km1(Number(t[id].miles) * KM_PER_MILE) : null,
-      notes: t[id]?.notes || ''
-    }))
-  }
+/** A run plan from a program file: { enabled, plan: [{ id, name, km, notes }] }, off when missing. */
+export function normalizeRuns(runs) {
+  if (!Array.isArray(runs?.plan)) return { enabled: false, plan: [] }
+  const ids = new Set()
+  const plan = runs.plan.slice(0, MAX_RUNS).map((r, i) => {
+    const name = String(r.name || '').trim() || `Run ${i + 1}`
+    let id = String(r.id || slug(name) || uid())          // readable ids from the name, e.g. "easy"
+    while (ids.has(id)) id = uid()
+    ids.add(id)
+    return { id, name, km: numOrNull(r.km), notes: String(r.notes || '') }
+  })
+  return { enabled: runs.enabled !== false, plan }
 }
 
 /** Give runs in next the ids of same-named runs in current, so logged runs stay attached. */
@@ -55,16 +39,11 @@ export function keepRunIds(next, current) {
   return { ...next, plan }
 }
 
-export const programRuns = program => normalizeRuns(program?.runs, program?.runTargets)
-
-/** Distance of a logged run in km (old records stored miles). */
-export const runKm = r => (r.km != null ? r.km : r.miles != null ? km1(r.miles * KM_PER_MILE) : null)
-
-export const runPlanId = r => r.planId ?? r.type
+/** The run plan of a stored program. */
+export const programRuns = program => program?.runs || { enabled: false, plan: [] }
 
 /** Display name of a logged run. */
-export const runName = (r, plan = []) =>
-  r.name || plan.find(p => p.id === runPlanId(r))?.name || LEGACY.find(t => t.id === r.type)?.name || 'Run'
+export const runName = (r, plan = []) => r.name || plan.find(p => p.id === r.planId)?.name || 'Run'
 
 // Distances are stored in km; runUnit ('km' or 'mi', a setting) only changes how they are shown
 // and typed.
@@ -105,8 +84,8 @@ export function runsForWeek(runs, iso, plan) {
   let km = 0
   for (const r of live(runs)) {
     if (r.date < from || r.date > to) continue
-    km += runKm(r) || 0
-    const id = runPlanId(r)
+    km += r.km || 0
+    const id = r.planId
     if (!ids.has(id)) continue
     if (!done[id] || r.date > done[id].date) done[id] = r
   }

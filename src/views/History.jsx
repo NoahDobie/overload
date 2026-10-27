@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useStore, unitOf, runUnitOf } from '../store.js'
+import { useStore, unitOf, runUnitOf, sessionName } from '../store.js'
 import { live, fmtDate, fmtNum, byDate } from '../lib/util.js'
 import { exKey } from '../lib/progression.js'
-import { runName, runKm, programRuns, fmtDist } from '../lib/runs.js'
+import { runName, programRuns, fmtDist } from '../lib/runs.js'
 import Heatmap from '../components/Heatmap.jsx'
 import { Icon, Segmented } from '../components/ui.jsx'
 
@@ -45,7 +45,6 @@ export default function History() {
   const sessions = live(S.sessions).sort(byDate).reverse()
   const runs = live(S.runs).sort(byDate).reverse()
   const { plan } = programRuns(S.program)
-  const dayName = id => S.program?.days.find(d => d.id === id)?.name || id
   const deleteRun = S.deleteRun
 
   const exercises = new Map()
@@ -61,7 +60,7 @@ export default function History() {
       <Segmented value={tab} onChange={setTab} options={[{ value: 'lifts', label: 'Sessions' }, { value: 'ex', label: 'Exercises' }, { value: 'runs', label: 'Runs' }]} />
 
       {tab === 'lifts' && (sessions.length
-        ? <ul className="list card">{sessions.map(s => <SessionRow key={s.id} s={s} dayName={dayName(s.dayId)} unit={unit} />)}</ul>
+        ? <ul className="list card">{sessions.map(s => <SessionRow key={s.id} s={s} dayName={sessionName(S, s)} unit={unit} />)}</ul>
         : <p className="empty">No workouts logged yet.</p>)}
 
       {tab === 'ex' && (exercises.size
@@ -75,7 +74,7 @@ export default function History() {
           <li key={r.id} className="lrow">
             <div className="lrow-h">
               <span><b>{runName(r, plan)}</b><br />
-                <span className="muted small">{fmtDate(r.date, true)}{runKm(r) != null ? ` · ${fmtDist(runKm(r), runUnitOf(S))}` : ''}{r.minutes != null ? ` · ${fmtNum(r.minutes)} min` : ''}{r.notes ? ` · ${r.notes}` : ''}</span></span>
+                <span className="muted small">{fmtDate(r.date, true)}{r.km != null ? ` · ${fmtDist(r.km, runUnitOf(S))}` : ''}{r.minutes != null ? ` · ${fmtNum(r.minutes)} min` : ''}{r.notes ? ` · ${r.notes}` : ''}</span></span>
               <button className="iconbtn" aria-label="Delete run" onClick={() => { if (confirm('Delete this run?')) deleteRun(r.id) }}><Icon name="trash" size={16} /></button>
             </div>
           </li>

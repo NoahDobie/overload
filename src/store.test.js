@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // zustand's persist middleware wants localStorage
 globalThis.localStorage ??= { _m: new Map(), getItem(k) { return this._m.get(k) ?? null }, setItem(k, v) { this._m.set(k, String(v)) }, removeItem(k) { this._m.delete(k) } }
-const { useStore, isStale, lastActivity, STALE_WORKOUT_MS, convertWeight, convertStep, hasWeights } = await import('./store.js')
+const { useStore, isStale, lastActivity, STALE_WORKOUT_MS, convertWeight, convertStep, hasWeights, sessionName } = await import('./store.js')
 
 describe('renameHistory', () => {
   beforeEach(() => useStore.getState().resetAll())
@@ -96,7 +96,10 @@ describe('updateSession', () => {
 
 describe('convertUnits', () => {
   it('converts weights and maps increments to plate steps', () => {
-    expect(convertWeight(225, 'kg')).toBe(102.1)
+    expect(convertWeight(225, 'kg')).toBe(102)        // snaps: 102.06 is within reach of 102
+    expect(convertWeight(102, 'lb')).toBe(225)
+    expect(convertWeight(137.5, 'kg')).toBe(62.4)     // too far from a 0.25 kg step: one decimal
+    expect(convertWeight(62.4, 'lb')).toBe(137.5)
     expect(convertWeight(100, 'lb')).toBe(220.5)
     expect(convertWeight(0, 'kg')).toBe(0)
     expect([2.5, 5, 10, 7].map(s => convertStep(s, 'kg'))).toEqual([1.25, 2.5, 5, 3])
@@ -117,7 +120,7 @@ describe('convertUnits', () => {
     const S = useStore.getState()
     expect(S.settings.unit).toBe('kg')
     expect(S.program.unit).toBe('kg')
-    expect(S.sessions[0].entries[0].sets[0].w).toBe(102.1)
+    expect(S.sessions[0].entries[0].sets[0].w).toBe(102)
     expect(S.sessions[0].updatedAt).toBeGreaterThan(1)
     expect(S.bodyweight[0].weight).toBe(81.6)
     expect(S.runs[0].km).toBe(6)
@@ -125,9 +128,11 @@ describe('convertUnits', () => {
     // in progress: last 225 × 5 hit the top of 3-5, so the target was 230 lb
     expect(S.active.entries[0].target.weight).toBe(104.3)
     expect(S.active.entries[0].sets[0].w).toBe(104.3)
-    // and back again lands close to where it started
+    // and back again lands exactly where it started
     useStore.getState().convertUnits('lb')
-    expect(useStore.getState().sessions[0].entries[0].sets[0].w).toBe(225.1)
+    expect(useStore.getState().sessions[0].entries[0].sets[0].w).toBe(225)
+    expect(useStore.getState().bodyweight[0].weight).toBe(180)
+    expect(useStore.getState().program.days[0].exercises[0].startWeight).toBe(250)
     expect(useStore.getState().program.days[0].exercises[0].increment).toBe(5)
   })
 })
@@ -184,5 +189,21 @@ describe('setRuns', () => {
     expect(useStore.getState().program.runs).toMatchObject({ enabled: true, plan: [{ name: 'Easy' }] })
     useStore.getState().setRuns({ enabled: false })
     expect(useStore.getState().program.runs).toMatchObject({ enabled: false, plan: [{ name: 'Easy' }] })
+  })
+})
+
+describe('logged workouts keep their day name', () => {
+  beforeEach(() => useStore.getState().resetAll())
+
+  it('is saved on finish and used once the day is gone', () => {
+    useStore.getState().setProgram({ name: 'P', days: [{ id: 'A1', week: 'A', name: 'Push', exercises: [{ id: 'b', name: 'Bench', sets: 1, repMin: 5, repMax: 8, rir: 2, increment: 5, startWeight: 100, muscles: [] }] }] })
+    useStore.getState().startWorkout('A1')
+    useStore.getState().updateSet(0, 0, { done: true })
+    useStore.getState().finishWorkout()
+    const s = useStore.getState().sessions[0]
+    expect(s.dayName).toBe('Push')
+    useStore.getState().clearProgram()
+    expect(sessionName(useStore.getState(), s)).toBe('Push')
+    expect(sessionName(useStore.getState(), { dayId: 'zz' })).toBe('Workout')
   })
 })

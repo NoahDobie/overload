@@ -58,15 +58,13 @@ describe('spreadsheet import', () => {
       { Week: 'A', Day: 1, Order: 1, Exercise: 'Bench', Sets: 4, RepMin: 5, RepMax: 8, Increment: 5, StartWeight: 185 },
       { Week: '', Day: '', Exercise: '' }
     ]
-    const { program, errors } = programFromRows(rows, { Build: 4, Deload: 1, RunLongMiles: 10 }, 'P', [{ Name: 'Tempo', Km: 8, Notes: '3×2 km' }, { Name: 'Long', Km: '' }])
+    const { program, errors } = programFromRows(rows, { Build: 4, Deload: 1 }, 'P', [{ Name: 'Tempo', Km: 8, Notes: '3×2 km' }, { Name: 'Long', Km: '' }])
     expect(errors).toEqual([])
     expect(program.days.map(d => d.name)).toEqual(['Push A', 'Pull A', 'Push B'])
     expect(program.days[0].exercises.map(e => e.name)).toEqual(['Bench', 'Fly'])
     expect(program.days[0].exercises[0]).toMatchObject({ sets: 4, repMin: 5, repMax: 8, startWeight: 185 })
     expect(program.block.build).toBe(4)
     expect(program.runs).toMatchObject({ enabled: true, plan: [{ name: 'Tempo', km: 8, notes: '3×2 km' }, { name: 'Long', km: null }] })
-    // older Settings columns (miles) still import when there is no Runs sheet
-    expect(programFromRows(rows, { RunLongMiles: 10 }).program.runs.plan.find(r => r.id === 'long').km).toBe(16.1)
     // nothing about runs: left out, so the current plan is kept
     expect(programFromRows(rows, null).program.runs).toBeUndefined()
     expect(programFromRows(rows, { Runs: 'off' }).program.runs.enabled).toBe(false)

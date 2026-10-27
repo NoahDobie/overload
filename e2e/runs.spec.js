@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { freshApp, buildFrom, state, setState, todayISO } from './helpers.js'
+import { freshApp, buildFrom, state } from './helpers.js'
 
 const runCard = page => page.locator('.card', { hasText: 'Runs this week' })
 
@@ -71,17 +71,6 @@ test('importing a lifting-only file keeps the run plan', async ({ page }) => {
   await expect(page.getByText('No runs in this file: your current run plan is kept.')).toBeVisible()
   await page.getByRole('button', { name: 'Import', exact: true }).click()
   expect((await state(page)).program.runs.plan.map(p => p.name)).toEqual(['Easy', 'Quality', 'Long'])
-})
-
-test('older data: no run plan and runs logged in miles', async ({ page }) => {
-  await buildFrom(page, 'Push / Pull')
-  const today = todayISO()
-  await setState(page, `s => { delete s.program.runs; s.program.runTargets = {}; s.runs = [{ id: 'old', date: '${today}', type: 'long', miles: 8, minutes: 70, notes: '', updatedAt: 1 }] }`)
-  await page.goto('/')
-  await expect(runCard(page).locator('.run-pill')).toHaveText(['Easy', 'Quality', 'Long12.9k · 1.2h'])
-  await page.getByRole('link', { name: 'History' }).click()
-  await page.getByRole('radio', { name: 'Runs' }).click()
-  await expect(page.getByText(/12\.9 km · 70 min/)).toBeVisible()
 })
 
 test('run units: miles shown and typed, km stored', async ({ page }) => {

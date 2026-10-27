@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useStore, unitOf, runUnitOf, blockOf, targetFor } from '../store.js'
 import { nextDayIndex, dayNumber } from '../lib/rotation.js'
-import { runsForWeek, programRuns, runTarget, runKm, toDist, fromDist, fmtDist, shortDist, shortTime } from '../lib/runs.js'
+import { runsForWeek, programRuns, runTarget, toDist, fromDist, fmtDist, shortDist, shortTime } from '../lib/runs.js'
 import { normalizeBlock } from '../lib/block.js'
 import { avg7, weeklyChange, sortedWeights } from '../lib/bodyweight.js'
 import { todayISO, fmtDate, fmtNum } from '../lib/util.js'
@@ -22,7 +22,7 @@ function BlockBadge({ pos }) {
 function RunSheet({ item, target, existing, unit, onClose }) {
   const logRun = useStore(s => s.logRun)
   const deleteRun = useStore(s => s.deleteRun)
-  const [dist, setDist] = useState(existing ? String(toDist(runKm(existing), unit) ?? '') : '')
+  const [dist, setDist] = useState(existing ? String(toDist(existing.km, unit) ?? '') : '')
   // Time as hours + minutes; stored as total minutes.
   const [hrs, setHrs] = useState(existing?.minutes >= 60 ? String(Math.floor(existing.minutes / 60)) : '')
   const [mins, setMins] = useState(existing?.minutes != null ? String(Math.round(existing.minutes % 60)) : '')
@@ -81,7 +81,7 @@ function RunsCard({ S, pos }) {
             <button key={p.id} className={'run-pill' + (r ? ' done' : '')} onClick={() => setOpen(p.id)}>
               <span className="run-check">{r ? <Icon name="check" size={16} stroke={3} /> : null}</span>
               <span className="run-l">{p.name}</span>
-              <span className="run-s">{r ? [shortDist(runKm(r), unit), shortTime(r.minutes)].filter(Boolean).join(' · ') || 'Done' : shortDist(t.km, unit)}</span>
+              <span className="run-s">{r ? [shortDist(r.km, unit), shortTime(r.minutes)].filter(Boolean).join(' · ') || 'Done' : shortDist(t.km, unit)}</span>
             </button>
           )
         })}
@@ -181,9 +181,8 @@ export default function Today() {
           </section>
 
           <div className="chips-wrap">
-            {['A', 'B', ...new Set(days.map(d => d.week))].filter((w, i, a) => a.indexOf(w) === i).map(w => {
+            {[...new Set(days.map(d => d.week))].map(w => {
               const ds = days.map((d, i) => [d, i]).filter(([d]) => d.week === w)
-              if (!ds.length) return null
               return (
                 <div key={w} className="chips">
                   {twoWeeks && <span className="chips-l">{w}</span>}

@@ -13,7 +13,7 @@ export default function DataSection() {
   const changeUnit = to => {
     if (to === unitOf(S)) return
     if (!hasWeights(S)) return setSettings({ unit: to })
-    const eg = to === 'kg' ? '225 lb becomes 102.1 kg' : '100 kg becomes 220.5 lb'
+    const eg = to === 'kg' ? '225 lb becomes 102 kg' : '100 kg becomes 220.5 lb'
     if (confirm(`Convert all logged weights, bodyweight, starting weights and increments to ${to}? For example ${eg}. Export a backup first if unsure.`)) S.convertUnits(to)
   }
   const backup = () => download(`overload-backup-${todayISO()}.json`, JSON.stringify(syncedPart(S), null, 2))

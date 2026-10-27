@@ -114,9 +114,9 @@ export function normalizeProgram(input) {
     block: src.block === null || src.block === false ? { enabled: false } : normalizeBlock(src.block)
   }
   // Left out when the source says nothing about runs, so an import keeps the current run plan.
-  if (src.runs != null || (src.runTargets && Object.keys(src.runTargets).length)) {
+  if (src.runs != null) {
     if (src.runs?.plan?.length > MAX_RUNS) warnings.push(`Only the first ${MAX_RUNS} runs are kept (max ${MAX_RUNS} a week)`)
-    program.runs = normalizeRuns(src.runs, src.runTargets)
+    program.runs = normalizeRuns(src.runs)
   }
   const b = program.block
   if (b.enabled !== false && (!Number.isInteger(b.build) || b.build < 1 || !Number.isInteger(b.deload) || b.deload < 0)) {
@@ -210,14 +210,7 @@ export function programFromRows(rows, settingsRow, name = 'Imported program', ru
       const run = pct(s.deloadrun)
       if (run != null) program.block.runDeloadFactor = run
     }
-    // Older templates: RunEasyMiles, RunQualityNotes, ...
-    const rt = {}
-    for (const t of ['easy', 'quality', 'long']) {
-      const miles = num(s[`run${t}miles`]), notes = s[`run${t}notes`]
-      if (miles != null || notes) rt[t] = { ...(miles != null ? { miles } : {}), ...(notes ? { notes } : {}) }
-    }
-    if (Object.keys(rt).length) program.runTargets = rt
-    if (s.runs != null && s.runs !== '') program.runs = { enabled: ON(s.runs), plan: programRuns(program).plan }
+    if (s.runs != null && s.runs !== '') program.runs = { enabled: ON(s.runs), plan: [] }
   }
   if (runRows) {
     const plan = runRows.map(lc).filter(r => r.name || r.km).map(r => ({ name: r.name, km: r.km, notes: r.notes }))

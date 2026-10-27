@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useStore, unitOf } from '../store.js'
+import { useStore, unitOf, sessionName } from '../store.js'
+import { exKey } from '../lib/progression.js'
 import { Icon } from '../components/ui.jsx'
 import SetTable from '../components/SetTable.jsx'
 
@@ -24,8 +25,8 @@ export default function SessionEditor() {
     )
   }
   const unit = unitOf(S)
-  const dayName = S.program?.days.find(d => d.id === draft.dayId)?.name || 'Workout'
-  const stepOf = name => S.program?.days.flatMap(d => d.exercises).find(e => e.name === name)?.increment || 5
+  const dayName = sessionName(S, draft)
+  const stepOf = name => S.program?.days.flatMap(d => d.exercises).find(e => exKey(e.name) === exKey(name))?.increment || (unit === 'kg' ? 2.5 : 5)
   const edit = fn => { setDraft(d => { const n = structuredClone(d); fn(n); return n }); setDirty(true) }
   const close = () => { if (!dirty || confirm('Discard your changes?')) nav('/history') }
   const save = () => { updateSession(id, draft); nav('/history') }

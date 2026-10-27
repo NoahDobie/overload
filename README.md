@@ -59,9 +59,7 @@ couldn't match.
 Optional sheets: `Settings` with `Build` (0 = no blocks), `Deload` (weeks), `DeloadSets`,
 `DeloadWeight` and `DeloadRun` (percent), `DeloadRIR` (extra reps in reserve) and `Runs` (on/off), and
 `Runs` with one row per weekly run: `Name`, `Km` (optional), `Notes`. A file without run info
-keeps your current run plan. Older files with `RunEasyMiles`-style columns still import (converted
-to km). Set `Increment`
-to 0 for exercises where you progress by reps only. If a file has any invalid rows, none of it is
+keeps your current run plan. Set `Increment` to 0 for exercises where you progress by reps only. If a file has any invalid rows, none of it is
 imported, and you get a list of the errors by row number.
 
 Re-importing a program keeps your history. Exercises are matched by name, so their progression
