@@ -173,7 +173,7 @@ export default function ProgramEditor() {
       <p className="small muted">Days run in this order and repeat. Drag <Icon name="grip" size={13} stroke={3} /> to reorder; tap an exercise to change it.</p>
 
       <SortableList as="div" className="days" itemClassName="card day" items={draft.days} getKey={d => d.key}
-        onMove={(from, to) => update(d => { d.days = moveItem(d.days, from, to); return d })} onDragChange={setDraggingDay}>
+        onMove={(from, to) => { setDraft(d => ({ ...d, days: moveItem(d.days, from, to) })); setDirty(true) }} onDragChange={setDraggingDay}>
         {(day, di, handle) => <>
           <div className="row gap">
             <DragHandle {...handle(day.key, day.name)} />

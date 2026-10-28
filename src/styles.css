@@ -390,7 +390,7 @@ input.day-name:focus { background: var(--surface-2); }
   touch-action: none; -webkit-user-select: none; user-select: none;
 }
 .drag-handle:focus-visible { outline: 2px solid var(--acc); }
-.dragging { position: relative; z-index: 20; cursor: grabbing; }
+.dragging { position: relative; z-index: 20; cursor: grabbing; will-change: transform; }
 .dragging .drag-handle { color: var(--acc); cursor: grabbing; }
 .card.dragging { box-shadow: 0 12px 32px rgba(0, 0, 0, .45); border-color: var(--acc); }
 .ed-list li.dragging { background: var(--surface-2); border-radius: 12px; box-shadow: 0 8px 22px rgba(0, 0, 0, .35); }

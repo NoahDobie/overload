@@ -40,13 +40,13 @@ async function centre(locator) {
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
 }
 
-/** Drag with the mouse from a handle to a page y. */
-export async function mouseDrag(page, handle, toY, steps = 16) {
+/** Drag with the mouse from a handle to a viewport y, then wait `hold` ms before letting go. */
+export async function mouseDrag(page, handle, toY, steps = 16, hold = 80) {
   const { x, y } = await centre(handle)
   await page.mouse.move(x, y)
   await page.mouse.down()
   for (let i = 1; i <= steps; i++) { await page.mouse.move(x, y + (toY - y) * i / steps); await page.waitForTimeout(16) }
-  await page.waitForTimeout(80)
+  await page.waitForTimeout(hold)
   await page.mouse.up()
   await page.waitForTimeout(80)
 }

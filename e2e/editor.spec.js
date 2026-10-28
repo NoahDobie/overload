@@ -72,10 +72,9 @@ test('drag to reorder days, exercises and runs', async ({ page }) => {
   await page.getByRole('button', { name: /^Upper \/ Lower/ }).click()
   await expect(page.getByRole('button', { name: /Move .* (up|down)/ })).toHaveCount(0)
 
-  // a day, with the mouse (auto-scrolls up)
-  const firstTop = (await page.locator('.card.day').first().boundingBox()).y
+  // a day, with the mouse: held at the top edge, the page scrolls up to the first slot
   await page.locator('.card.day', { has: page.locator('input[value="Lower 2"]') }).scrollIntoViewIfNeeded()
-  await mouseDrag(page, page.getByRole('button', { name: /Reorder Lower 2/ }), firstTop - 200, 40)
+  await mouseDrag(page, page.getByRole('button', { name: /Reorder Lower 2/ }), 10, 20, 1500)
   expect(await dayNames(page)).toEqual(['Lower 2', 'Upper 1', 'Lower 1', 'Upper 2'])
   await expect(page.locator('.ed-list')).toHaveCount(4)       // days expanded again
 
@@ -116,4 +115,15 @@ test('drag to reorder days, exercises and runs', async ({ page }) => {
   expect(S.program.days.map(d => d.name)).toEqual(['Lower 2', 'Upper 1', 'Lower 1', 'Upper 2'])
   expect(S.program.days[1].exercises[1].name).toBe(after[0])
   expect(S.program.runs.plan.map(r => r.name)).toEqual(['Long', 'Easy'])
+})
+
+test('a short drag moves a day one slot, not to the top', async ({ page }) => {
+  await freshApp(page)
+  await page.getByRole('link', { name: 'Build a program' }).click()
+  await page.getByRole('button', { name: /^Upper \/ Lower/ }).click()
+  await page.locator('.card.day', { has: page.locator('input[value="Lower 2"]') }).scrollIntoViewIfNeeded()
+  const handle = page.getByRole('button', { name: /Reorder Lower 2/ })
+  const { y, height } = await handle.boundingBox()
+  await touchDrag(page, handle, y + height / 2 - 120)
+  expect(await dayNames(page)).toEqual(['Upper 1', 'Lower 1', 'Lower 2', 'Upper 2'])
 })
